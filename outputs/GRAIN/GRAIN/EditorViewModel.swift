@@ -26,6 +26,7 @@ final class EditorViewModel: ObservableObject {
     @Published var noticeMessage: String?
 
     private var previewTask: Task<Void, Never>?
+    private var importTask: Task<Void, Never>?
     private var noticeTask: Task<Void, Never>?
     private var sourcePreview: CGImage?
     private var previewNeedsUpdate = false
@@ -46,6 +47,7 @@ final class EditorViewModel: ObservableObject {
 
     func returnHome() {
         previewTask?.cancel()
+        importTask?.cancel()
         previewTask = nil
         previewNeedsUpdate = false
         previewGeneration += 1
@@ -87,14 +89,6 @@ final class EditorViewModel: ObservableObject {
             }
             schedulePreview()
             isRecommending = false
-            let exposure = String(format: "%+.1f", recommendation.settings.exposure)
-            showNotice(
-                "推荐：\(recommendation.profile.name)\n"
-                    + "曝光 \(exposure) EV · 色温 \(Int(recommendation.settings.temperature))K · "
-                    + "高光 \(Int(recommendation.settings.highlights)) · 阴影 \(Int(recommendation.settings.shadows))\n"
-                    + recommendation.reason,
-                duration: 4.2
-            )
         }
     }
 
@@ -228,13 +222,6 @@ final class EditorViewModel: ObservableObject {
         previewTask = nil
         previewNeedsUpdate = false
         previewGeneration += 1
-        sourcePreview = nil
-        originalPreview = nil
-        fullGradedPreview = nil
-        editedPreview = nil
-        histogram = nil
-        crop = .identity
-        textOverlays = []
 
         let supportedExtensions = ["arw", "srf", "sr2", "dng", "jpg", "jpeg", "heic", "heif", "png"]
         guard supportedExtensions.contains(incomingURL.pathExtension.lowercased()) else {
@@ -253,32 +240,38 @@ final class EditorViewModel: ObservableObject {
         do {
             let localURL = try copyIntoLibrary(incomingURL)
             let asset = try RawImageProcessor.metadata(for: localURL)
-            photo = asset
-            exportOptions.keepLocation = asset.hasLocation
-            preparePreviewSource(for: localURL)
+            importTask?.cancel()
+            let generation = previewGeneration
+            importTask = Task {
+                do {
+                    let source = try await Task.detached(priority: .userInitiated) {
+                        try RawImageProcessor.renderSourcePreview(from: localURL)
+                    }.value
+                    guard !Task.isCancelled, previewGeneration == generation else { return }
+
+                    sourcePreview = source
+                    originalPreview = source
+                    fullGradedPreview = nil
+                    editedPreview = nil
+                    histogram = nil
+                    crop = .identity
+                    textOverlays = []
+                    selectedProfile = .neutral
+                    settings = FilmProfile.neutral.factorySettings
+                    intensity = 1
+                    photo = asset
+                    exportOptions.keepLocation = asset.hasLocation
+                    isPreparing = false
+                    schedulePreview()
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    isPreparing = false
+                    errorMessage = error.localizedDescription
+                }
+            }
         } catch {
             isPreparing = false
             errorMessage = error.localizedDescription
-        }
-    }
-
-    private func preparePreviewSource(for url: URL) {
-        previewTask?.cancel()
-        previewTask = Task {
-            do {
-                let source = try await Task.detached(priority: .userInitiated) {
-                    try RawImageProcessor.renderSourcePreview(from: url)
-                }.value
-                guard !Task.isCancelled else { return }
-                sourcePreview = source
-                originalPreview = source
-                isPreparing = false
-                recommendLook()
-            } catch {
-                guard !Task.isCancelled else { return }
-                isPreparing = false
-                errorMessage = error.localizedDescription
-            }
         }
     }
 

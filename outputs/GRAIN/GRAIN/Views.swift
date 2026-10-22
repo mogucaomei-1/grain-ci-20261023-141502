@@ -87,6 +87,19 @@ struct RootView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .overlay {
+            if editor.isPreparing && editor.photo == nil {
+                VStack(spacing: 10) {
+                    ProgressView().tint(GrainTheme.paper)
+                    Text("正在读取原始照片")
+                        .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(GrainTheme.paper)
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 13)
+                .background(.black.opacity(0.78), in: Capsule())
+            }
+        }
         .overlay(alignment: .leading) {
             if editor.photo != nil {
                 Color.clear
