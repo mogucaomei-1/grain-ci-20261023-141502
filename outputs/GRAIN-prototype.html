@@ -54,11 +54,15 @@
     .film .swatch{width:71px;height:49px;border-radius:9px;padding:7px;display:flex;align-items:flex-end;color:white;font:800 7.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.7px;box-shadow:inset 0 -24px 25px rgba(0,0,0,.32)}
     .film .name{margin-top:6px;width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:9.5px;text-align:left}
     .film.active .name{color:var(--paper);font-weight:650}
-    .controls{height:130px;flex:none;background:var(--surface);border-top:1px solid var(--line);padding:9px 18px 18px}
-    .tools{display:flex;gap:7px}
-    .tool{flex:1;height:31px;border:0;border-radius:999px;background:var(--surface);color:var(--muted);font-size:10px;font-weight:650;cursor:pointer}
-    .tool.active{background:var(--paper);color:var(--black)}
-    .slider-row{height:44px;display:flex;align-items:center;gap:12px}
+    .controls{height:146px;flex:none;background:var(--surface);border-top:1px solid var(--line);padding:8px 18px 12px}
+    .categories{display:flex;align-items:center;gap:22px;height:25px}
+    .category{border:0;background:none;color:var(--muted);font-size:10.5px;font-weight:650;padding:0 0 5px;cursor:pointer}
+    .category.active{color:var(--paper);box-shadow:inset 0 -2px 0 var(--accent)}
+    .tool-row{height:34px;display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:none}
+    .tool-row::-webkit-scrollbar{display:none}
+    .tool{display:none;height:27px;flex:none;border:0;border-radius:999px;background:var(--raised);color:var(--muted);font-size:9.5px;font-weight:650;padding:0 13px;cursor:pointer}
+    .tool.show{display:block}.tool.active{background:var(--paper);color:var(--black)}
+    .slider-row{height:38px;display:flex;align-items:center;gap:12px}
     input[type=range]{appearance:none;width:100%;height:22px;background:transparent}
     input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:2px;background:linear-gradient(90deg,var(--accent) 0 var(--p,50%),rgba(255,255,255,.14) var(--p,50%))}
     input[type=range]::-webkit-slider-thumb{appearance:none;width:11px;height:11px;margin-top:-4.5px;border-radius:50%;background:var(--paper);box-shadow:0 0 0 3px rgba(244,237,225,.08)}
@@ -93,6 +97,7 @@
     <div class="status"><span>16:40</span><span>••••　▮▮▮　⌁</span></div>
     <div class="screen">
       <header class="topbar">
+        <button class="round" id="backHome" style="background:transparent;font-size:20px">‹</button>
         <div class="mark"></div>
         <div class="brand"><strong>GRAIN</strong><span>RAW FILM LAB 1.1</span></div>
         <div class="top-actions">
@@ -126,13 +131,30 @@
         </section>
 
         <section class="controls">
-          <div class="tools">
-            <button class="tool active" data-tool="intensity">强度</button>
-            <button class="tool" data-tool="exposure">曝光</button>
-            <button class="tool" data-tool="temperature">色温</button>
-            <button class="tool" data-tool="grain">颗粒</button>
+          <div class="categories">
+            <button class="category active" data-category="light">光线</button>
+            <button class="category" data-category="color">颜色</button>
+            <button class="category" data-category="effects">效果</button>
           </div>
-          <div class="slider-row"><input id="slider" type="range" min="0" max="100" value="82"><output id="value">82</output></div>
+          <div class="tool-row">
+            <button class="tool show active" data-tool="exposure" data-cat="light">曝光</button>
+            <button class="tool show" data-tool="contrast" data-cat="light">对比</button>
+            <button class="tool show" data-tool="highlights" data-cat="light">高光</button>
+            <button class="tool show" data-tool="shadows" data-cat="light">阴影</button>
+            <button class="tool show" data-tool="whites" data-cat="light">白色</button>
+            <button class="tool show" data-tool="blacks" data-cat="light">黑色</button>
+            <button class="tool" data-tool="temperature" data-cat="color">色温</button>
+            <button class="tool" data-tool="tint" data-cat="color">色调</button>
+            <button class="tool" data-tool="vibrance" data-cat="color">自然饱和</button>
+            <button class="tool" data-tool="saturation" data-cat="color">饱和</button>
+            <button class="tool" data-tool="intensity" data-cat="effects">强度</button>
+            <button class="tool" data-tool="clarity" data-cat="effects">清晰度</button>
+            <button class="tool" data-tool="sharpness" data-cat="effects">锐化</button>
+            <button class="tool" data-tool="fade" data-cat="effects">褪色</button>
+            <button class="tool" data-tool="grain" data-cat="effects">颗粒</button>
+            <button class="tool" data-tool="vignette" data-cat="effects">暗角</button>
+          </div>
+          <div class="slider-row"><input id="slider" type="range" min="-200" max="200" value="12"><output id="value">+0.1</output></div>
         </section>
       </main>
     </div>
@@ -160,37 +182,71 @@
       cinestill:{name:'CineStill 800T',badge:'800T',filter:'saturate(.96) contrast(.97) hue-rotate(6deg) brightness(1.02)',range:[0,100],value:82},
       hp5:{name:'HP5 Plus',badge:'HP5',filter:'grayscale(1) contrast(1.17) brightness(.98)',range:[0,100],value:82}
     };
-    let activeProfile='portra',activeTool='intensity';
+    let activeProfile='portra',activeTool='exposure',activeCategory='light';
     const sliders={
       intensity:[0,100,82,''],
       exposure:[-200,200,12,'EV'],
+      contrast:[-100,100,0,''],
+      highlights:[-100,100,0,''],
+      shadows:[-100,100,0,''],
+      whites:[-100,100,0,''],
+      blacks:[-100,100,0,''],
       temperature:[3500,9000,6900,'K'],
-      grain:[0,60,18,'']
+      tint:[-100,100,0,''],
+      vibrance:[-100,100,0,''],
+      saturation:[-100,100,0,''],
+      clarity:[-100,100,0,''],
+      sharpness:[0,100,0,''],
+      fade:[0,100,0,''],
+      grain:[0,100,18,''],
+      vignette:[0,100,0,'']
     };
     const $=s=>document.querySelector(s), photo=$('#photo');
     function setFill(el){const p=(+el.value-+el.min)/(+el.max-+el.min)*100;el.style.setProperty('--p',p+'%')}
     function choose(key){
       activeProfile=key;const p=profiles[key];
       document.documentElement.style.setProperty('--filter',p.filter);
+      applyAdjustments();
       $('#filmName').textContent=p.name;$('#profilePill').textContent=p.name;$('#exportFilm').textContent=p.badge;
       document.querySelectorAll('.film').forEach(x=>x.classList.toggle('active',x.dataset.profile===key));
       photo.classList.add('loading');setTimeout(()=>photo.classList.remove('loading'),180);
     }
     document.querySelectorAll('.film').forEach(b=>b.onclick=()=>choose(b.dataset.profile));
+    function selectCategory(category){
+      activeCategory=category;
+      document.querySelectorAll('.category').forEach(x=>x.classList.toggle('active',x.dataset.category===category));
+      const tools=[...document.querySelectorAll('.tool')];
+      tools.forEach(x=>x.classList.toggle('show',x.dataset.cat===category));
+      const first=tools.find(x=>x.dataset.cat===category);
+      if(first) selectTool(first);
+    }
+    function selectTool(button){
+      activeTool=button.dataset.tool;
+      document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('active',x===button));
+      const s=sliders[activeTool],slider=$('#slider');
+      slider.min=s[0];slider.max=s[1];slider.value=s[2];setFill(slider);updateValue();
+    }
+    document.querySelectorAll('.category').forEach(b=>b.onclick=()=>selectCategory(b.dataset.category));
     document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{
-      activeTool=b.dataset.tool;document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('active',x===b));
-      const s=sliders[activeTool],slider=$('#slider');slider.min=s[0];slider.max=s[1];slider.value=s[2];setFill(slider);updateValue();
+      selectTool(b);
     });
+    function applyAdjustments(){
+      const exposure=sliders.exposure[2]/100;
+      const contrast=sliders.contrast[2]/100;
+      const saturation=sliders.saturation[2]/100;
+      $('#editedPhoto').style.filter=`${profiles[activeProfile].filter} brightness(${1+exposure*.18}) contrast(${1+contrast*.45}) saturate(${1+saturation})`;
+    }
     function updateValue(){
       const s=sliders[activeTool],v=+$('#slider').value;
       if(activeTool==='exposure')$('#value').textContent=(v>=0?'+':'')+(v/100).toFixed(1);
       else if(activeTool==='temperature')$('#value').textContent=v+'K';
-      else $('#value').textContent=v;
+      else $('#value').textContent=(v>0?'+':'')+v;
     }
-    $('#slider').oninput=()=>{setFill($('#slider'));updateValue();sliders[activeTool][2]=+$('#slider').value;photo.classList.add('loading');setTimeout(()=>photo.classList.remove('loading'),100)};
+    $('#slider').oninput=()=>{setFill($('#slider'));updateValue();sliders[activeTool][2]=+$('#slider').value;applyAdjustments();photo.classList.add('loading');setTimeout(()=>photo.classList.remove('loading'),100)};
     $('#holdOriginal').addEventListener('pointerdown',()=>{photo.classList.add('holding')});
     ['pointerup','pointercancel','pointerleave'].forEach(e=>$('#holdOriginal').addEventListener(e,()=>photo.classList.remove('holding')));
     $('#reset').onclick=()=>choose(activeProfile);
+    $('#backHome').onclick=()=>{$('#fileInput').value='';document.querySelector('.workspace').style.opacity='.18';setTimeout(()=>document.querySelector('.workspace').style.opacity='1',350)};
     $('#openExport').onclick=()=>$('#phone').classList.add('sheet-open');
     $('#closeExport').onclick=$('#overlay').onclick=()=>$('#phone').classList.remove('sheet-open');
     document.querySelectorAll('.format').forEach(b=>b.onclick=()=>{document.querySelectorAll('.format').forEach(x=>x.classList.toggle('active',x===b));const t=b.querySelector('strong').textContent;$('#formatFact').textContent=t;document.querySelector('.export-btn small').textContent=t});

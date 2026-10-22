@@ -13,7 +13,7 @@ struct DocumentRawImporter: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(
-            forOpeningContentTypes: [.rawImage, .image],
+            forOpeningContentTypes: [.data, .image],
             asCopy: true
         )
         picker.delegate = context.coordinator
@@ -83,12 +83,10 @@ struct PhotosRawImporter: UIViewControllerRepresentable {
                 return
             }
 
-            let rawExtensions = Set(["arw", "srf", "sr2", "dng"])
+            let rawMarkers = ["arw", "srf", "sr2", "dng", "camera-raw"]
             let typeIdentifier = provider.registeredTypeIdentifiers.first { identifier in
-                guard let type = UTType(identifier),
-                      let fileExtension = type.preferredFilenameExtension
-                else { return false }
-                return rawExtensions.contains(fileExtension.lowercased())
+                let lowercased = identifier.lowercased()
+                return rawMarkers.contains { lowercased.contains($0) }
             } ?? provider.registeredTypeIdentifiers.first { identifier in
                 guard let type = UTType(identifier) else { return false }
                 return type.conforms(to: .rawImage)

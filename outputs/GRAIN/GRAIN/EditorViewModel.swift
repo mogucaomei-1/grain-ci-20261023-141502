@@ -88,6 +88,13 @@ final class EditorViewModel: ObservableObject {
         isPreparing = true
         exportResult = nil
 
+        let supportedExtensions = ["arw", "srf", "sr2", "dng", "jpg", "jpeg", "heic", "heif", "png"]
+        guard supportedExtensions.contains(incomingURL.pathExtension.lowercased()) else {
+            isPreparing = false
+            errorMessage = "请选择 Sony ARW、DNG、HEIC 或 JPEG 图片。"
+            return
+        }
+
         let accessed = incomingURL.startAccessingSecurityScopedResource()
         defer {
             if accessed {
