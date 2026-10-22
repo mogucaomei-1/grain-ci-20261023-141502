@@ -300,6 +300,17 @@ struct PhotoTextOverlay: Identifiable, Equatable, Codable, Sendable {
     var alpha = 1.0
 }
 
+struct MosaicPoint: Equatable, Codable, Sendable {
+    var x: Double
+    var y: Double
+}
+
+struct MosaicStroke: Identifiable, Equatable, Codable, Sendable {
+    var id = UUID()
+    var points: [MosaicPoint]
+    var brushSize: Double
+}
+
 enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
     case heic
     case jpeg

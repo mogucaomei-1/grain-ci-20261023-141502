@@ -277,6 +277,7 @@ private struct EditorWorkspace: View {
     @State private var editingTextID: UUID?
     @State private var selectedTextID: UUID?
     @State private var showTextEditor = false
+    @State private var showMosaicEditor = false
     @State private var didSwipeBack = false
 
     var body: some View {
@@ -296,6 +297,7 @@ private struct EditorWorkspace: View {
 
             AdjustPanel(
                 onCrop: { showCropEditor = true },
+                onMosaic: { showMosaicEditor = true },
                 onAddText: {
                     let id = editor.addTextOverlay()
                     editingTextID = id
@@ -307,6 +309,10 @@ private struct EditorWorkspace: View {
         }
         .fullScreenCover(isPresented: $showCropEditor) {
             CropEditorView()
+                .environmentObject(editor)
+        }
+        .fullScreenCover(isPresented: $showMosaicEditor) {
+            MosaicEditorView()
                 .environmentObject(editor)
         }
         .sheet(isPresented: $showTextEditor, onDismiss: { editingTextID = nil }) {
@@ -949,6 +955,7 @@ private struct AdjustPanel: View {
     @EnvironmentObject private var editor: EditorViewModel
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     let onCrop: () -> Void
+    let onMosaic: () -> Void
     let onAddText: () -> Void
     @State private var selectedCategory: AdjustCategory = .light
     @State private var selectedTool: AdjustTool = .exposure
@@ -989,6 +996,16 @@ private struct AdjustPanel: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("裁剪与构图")
+
+                Button(action: onMosaic) {
+                    Image(systemName: "square.grid.3x3.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(GrainTheme.paper)
+                        .frame(width: 30, height: 27)
+                        .background(GrainTheme.raised, in: RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("添加马赛克")
 
                 Button(action: onAddText) {
                     Image(systemName: "textformat")

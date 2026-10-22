@@ -23,6 +23,7 @@ final class EditorViewModel: ObservableObject {
     @Published var exportOptions = ExportOptions()
     @Published var crop = CropTransform.identity
     @Published var textOverlays: [PhotoTextOverlay] = []
+    @Published var mosaicStrokes: [MosaicStroke] = []
     @Published var errorMessage: String?
     @Published var exportResult: ExportResult?
     @Published var noticeMessage: String?
@@ -64,6 +65,7 @@ final class EditorViewModel: ObservableObject {
         histogram = nil
         crop = .identity
         textOverlays = []
+        mosaicStrokes = []
         exportResult = nil
         errorMessage = nil
         isPreparing = false
@@ -190,6 +192,21 @@ final class EditorViewModel: ObservableObject {
         textOverlays.removeAll { $0.id == id }
     }
 
+    func addMosaicStroke(_ stroke: MosaicStroke) {
+        guard !stroke.points.isEmpty else { return }
+        recordUndoSnapshot()
+        mosaicStrokes.append(stroke)
+        isRecommendationApplied = false
+        schedulePreview()
+    }
+
+    func clearMosaicStrokes() {
+        guard !mosaicStrokes.isEmpty else { return }
+        recordUndoSnapshot()
+        mosaicStrokes = []
+        schedulePreview()
+    }
+
     func markManualAdjustment() {
         isRecommendationApplied = false
     }
@@ -212,6 +229,7 @@ final class EditorViewModel: ObservableObject {
             intensity = snapshot.intensity
             crop = snapshot.crop
             textOverlays = snapshot.overlays
+            mosaicStrokes = snapshot.mosaics
             isRecommendationApplied = snapshot.recommendationApplied
         }
         canUndo = !undoStack.isEmpty
@@ -234,6 +252,7 @@ final class EditorViewModel: ObservableObject {
                 let intensity = self.intensity
                 let suppressVignette = self.photo?.isLikelyScreenshot ?? false
                 let crop = self.crop
+                let mosaics = self.mosaicStrokes
 
                 do {
                     let rendered = try await Task.detached(priority: .userInitiated) {
@@ -245,10 +264,11 @@ final class EditorViewModel: ObservableObject {
                             suppressVignette: suppressVignette
                         )
                         let cropped = CropProcessor.apply(crop, to: edited)
+                        let mosaicked = MosaicProcessor.apply(mosaics, to: cropped)
                         return (
                             full: edited,
-                            edited: cropped,
-                            histogram: LocalLookAdvisor.histogram(from: cropped)
+                            edited: mosaicked,
+                            histogram: LocalLookAdvisor.histogram(from: mosaicked)
                         )
                     }.value
                     guard !Task.isCancelled, self.previewGeneration == generation else { break }
@@ -307,6 +327,7 @@ final class EditorViewModel: ObservableObject {
             histogram = nil
             crop = .identity
             textOverlays = []
+            mosaicStrokes = []
             selectedProfile = .neutral
             settings = FilmProfile.neutral.factorySettings
             intensity = 1
@@ -354,6 +375,7 @@ final class EditorViewModel: ObservableObject {
         let options = exportOptions
         let crop = crop
         let textOverlays = textOverlays
+        let mosaicStrokes = mosaicStrokes
         let format = options.format
         let stem = makeExportStem(for: photo, profile: profile)
         let outputURL = FileManager.default.temporaryDirectory
@@ -374,6 +396,7 @@ final class EditorViewModel: ObservableObject {
                         intensity: intensity,
                         options: options,
                         crop: crop,
+                        mosaicStrokes: mosaicStrokes,
                         textOverlays: textOverlays,
                         to: outputURL
                     )
@@ -443,6 +466,7 @@ final class EditorViewModel: ObservableObject {
             intensity: intensity,
             crop: crop,
             overlays: textOverlays,
+            mosaics: mosaicStrokes,
             recommendationApplied: isRecommendationApplied
         )
     }
@@ -454,5 +478,6 @@ private struct EditorSnapshot: Equatable {
     let intensity: Double
     let crop: CropTransform
     let overlays: [PhotoTextOverlay]
+    let mosaics: [MosaicStroke]
     let recommendationApplied: Bool
 }

@@ -163,6 +163,7 @@ struct RawImageProcessor {
         intensity: Double,
         options: ExportOptions,
         crop: CropTransform = .identity,
+        mosaicStrokes: [MosaicStroke] = [],
         textOverlays: [PhotoTextOverlay] = [],
         to outputURL: URL
     ) throws -> ExportResult {
@@ -195,7 +196,8 @@ struct RawImageProcessor {
                 throw ImageProcessorError.cannotRender
             }
             let croppedImage = CropProcessor.apply(crop, to: gradedImage)
-            let cgImage = TextOverlayRenderer.render(textOverlays, onto: croppedImage)
+            let mosaickedImage = MosaicProcessor.apply(mosaicStrokes, to: croppedImage)
+            let cgImage = TextOverlayRenderer.render(textOverlays, onto: mosaickedImage)
 
             var actualFormat = options.format
             var destination = CGImageDestinationCreateWithURL(
@@ -551,5 +553,104 @@ struct RawImageProcessor {
         }
 
         return properties
+    }
+}
+
+enum MosaicProcessor {
+    private static let context = CIContext(options: [
+        .cacheIntermediates: false,
+        .workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB) as Any
+    ])
+
+    static func apply(_ strokes: [MosaicStroke], to image: CGImage) -> CGImage {
+        guard !strokes.isEmpty else { return image }
+
+        let width = image.width
+        let height = image.height
+        guard width > 0, height > 0 else { return image }
+
+        let source = CIImage(cgImage: image)
+        let minDimension = Double(min(width, height))
+        let blockSize = max(7, floor(minDimension * 0.032))
+        let pixelated = source
+            .applyingFilter("CIPixellate", parameters: [
+                kCIInputScaleKey: blockSize,
+                kCIInputCenterKey: CIVector(x: source.extent.midX, y: source.extent.midY)
+            ])
+            .cropped(to: source.extent)
+
+        guard let mask = makeMask(strokes, width: width, height: height),
+              let blend = CIFilter(name: "CIBlendWithMask")
+        else {
+            return image
+        }
+        blend.setValue(pixelated, forKey: kCIInputImageKey)
+        blend.setValue(source, forKey: kCIInputBackgroundImageKey)
+        blend.setValue(CIImage(cgImage: mask), forKey: kCIInputMaskImageKey)
+
+        guard let output = blend.outputImage?.cropped(to: source.extent),
+              let result = context.createCGImage(output, from: source.extent)
+        else {
+            return image
+        }
+        return result
+    }
+
+    private static func makeMask(
+        _ strokes: [MosaicStroke],
+        width: Int,
+        height: Int
+    ) -> CGImage? {
+        let colorSpace = CGColorSpaceCreateDeviceGray()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else {
+            return nil
+        }
+
+        context.setFillColor(gray: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.setStrokeColor(gray: 1, alpha: 1)
+        context.setFillColor(gray: 1, alpha: 1)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+
+        let minDimension = CGFloat(min(width, height))
+        for stroke in strokes {
+            let points = stroke.points.map {
+                CGPoint(
+                    x: CGFloat($0.x) * CGFloat(width),
+                    y: (1 - CGFloat($0.y)) * CGFloat(height)
+                )
+            }
+            let lineWidth = max(6, CGFloat(stroke.brushSize) * minDimension)
+            context.setLineWidth(lineWidth)
+
+            if points.count == 1, let point = points.first {
+                let radius = lineWidth / 2
+                context.fillEllipse(
+                    in: CGRect(
+                        x: point.x - radius,
+                        y: point.y - radius,
+                        width: lineWidth,
+                        height: lineWidth
+                    )
+                )
+            } else if let first = points.first {
+                context.beginPath()
+                context.move(to: first)
+                for point in points.dropFirst() {
+                    context.addLine(to: point)
+                }
+                context.strokePath()
+            }
+        }
+        return context.makeImage()
     }
 }
