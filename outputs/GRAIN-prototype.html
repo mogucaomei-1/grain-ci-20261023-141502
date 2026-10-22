@@ -103,7 +103,8 @@
         <div class="mark"><i></i></div>
         <div class="brand"><strong>GRAIN</strong></div>
         <div class="top-actions">
-          <button class="round" id="importButton">＋</button>
+          <button class="round" id="albumButton" title="从相册选择">▧</button>
+          <button class="round" id="filesButton" title="从文件导入">⌑</button>
           <button class="round export" id="openExport">↗</button>
         </div>
         <input id="fileInput" type="file" accept=".arw,.ARW,.dng,.DNG,image/*">
@@ -120,7 +121,7 @@
         </section>
 
         <section class="filmbar">
-          <div class="section-head"><b>胶片</b><span id="filmName">柯达 波特拉 400</span><div class="film-actions"><button class="recommend" id="recommend">✦ 推荐</button><button id="reset">↺</button></div></div>
+          <div class="section-head"><b>胶片</b><span id="filmName">柯达 波特拉 400</span><div class="film-actions"><button id="copyPreset" title="复制预设">⧉</button><button id="pastePreset" title="粘贴预设">▣</button><button class="recommend" id="recommend">✦ 推荐</button><button id="reset">↺</button></div></div>
           <div class="films" id="films">
             <button class="film" data-profile="neutral"><span class="swatch" style="background:linear-gradient(135deg,#8b8d8a,#b7b3a9,#dfd8cb)">原图</span><span class="name">原图</span></button>
             <button class="film active" data-profile="portra"><span class="swatch" style="background:linear-gradient(135deg,#b86f58,#d6aa86,#eadcc7)">波特拉</span><span class="name">柯达 波特拉 400</span></button>
@@ -273,7 +274,10 @@
     $('#openExport').onclick=()=>$('#phone').classList.add('sheet-open');
     $('#closeExport').onclick=$('#overlay').onclick=()=>$('#phone').classList.remove('sheet-open');
     document.querySelectorAll('.format').forEach(b=>b.onclick=()=>{document.querySelectorAll('.format').forEach(x=>x.classList.toggle('active',x===b));const t=b.querySelector('strong').textContent;$('#formatFact').textContent=t;document.querySelector('.export-btn small').textContent=t});
-    $('#importButton').onclick=()=>$('#fileInput').click();
+    $('#filesButton').onclick=()=>$('#fileInput').click();
+    $('#albumButton').onclick=()=>alert('iOS App 首页已直接显示相册网格。');
+    $('#copyPreset').onclick=()=>$('#copyPreset').textContent='已复制';
+    $('#pastePreset').onclick=()=>choose('portra');
     $('#fileInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const ext=f.name.split('.').pop().toUpperCase();if(ext==='ARW'){alert('浏览器原型不能解码 ARW；请使用 iOS 1.1 测试版。');return}const url=URL.createObjectURL(f);$('#editedPhoto').src=url;$('#originalPhoto').src=url;const i=new Image();i.onload=()=>{$('#dims').textContent=i.naturalWidth+' × '+i.naturalHeight};i.src=url};
     setFill($('#slider'));updateValue();
   </script>
