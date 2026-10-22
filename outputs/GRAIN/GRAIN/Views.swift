@@ -8,6 +8,7 @@ struct RootView: View {
     @State private var showDocumentPicker = false
     @State private var showExportSheet = false
     @State private var showInfoSheet = false
+    @State private var editorSwipeOffset: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -18,6 +19,8 @@ struct RootView: View {
                     hasPhoto: editor.photo != nil,
                     onFiles: { showDocumentPicker = true },
                     onInfo: { showInfoSheet = true },
+                    canUndo: editor.canUndo,
+                    onUndo: editor.undo,
                     histogramVisible: showHistogram,
                     onToggleHistogram: {
                         withAnimation(.easeOut(duration: 0.18)) {
@@ -30,13 +33,31 @@ struct RootView: View {
                     }
                 )
 
-                if editor.photo == nil {
-                    PhotoLibraryHome(library: photoLibrary) { asset in
-                        importLibraryAsset(asset)
+                ZStack {
+                    if editor.photo == nil {
+                        PhotoLibraryHome(library: photoLibrary) { asset in
+                            importLibraryAsset(asset)
+                        }
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: .leading).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            )
+                        )
+                    } else {
+                        EditorWorkspace(showHistogram: showHistogram)
+                            .offset(x: editorSwipeOffset)
+                            .scaleEffect(1 - min(editorSwipeOffset / 1800, 0.035))
+                            .transition(
+                                .asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .trailing).combined(with: .opacity)
+                                )
+                            )
                     }
-                } else {
-                    EditorWorkspace(showHistogram: showHistogram)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.spring(response: 0.42, dampingFraction: 0.88), value: editor.photo?.id)
             }
         }
         .sheet(isPresented: $showDocumentPicker) {
@@ -107,11 +128,25 @@ struct RootView: View {
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 12)
+                            .onChanged { value in
+                                let horizontal = value.translation.width
+                                let vertical = abs(value.translation.height)
+                                if horizontal > 0, horizontal > vertical * 1.35 {
+                                    editorSwipeOffset = min(horizontal, 260)
+                                }
+                            }
                             .onEnded { value in
                                 let horizontal = value.translation.width
                                 let vertical = abs(value.translation.height)
-                                if horizontal > 72, horizontal > vertical * 1.6 {
-                                    editor.returnHome()
+                                if horizontal > 72 || value.predictedEndTranslation.width > 150 {
+                                    withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+                                        editor.returnHome()
+                                        editorSwipeOffset = 0
+                                    }
+                                } else {
+                                    withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                                        editorSwipeOffset = 0
+                                    }
                                 }
                             }
                     )
@@ -136,6 +171,8 @@ private struct MinimalTopBar: View {
     let hasPhoto: Bool
     let onFiles: () -> Void
     let onInfo: () -> Void
+    let canUndo: Bool
+    let onUndo: () -> Void
     let histogramVisible: Bool
     let onToggleHistogram: () -> Void
     let onExport: () -> Void
@@ -184,6 +221,17 @@ private struct MinimalTopBar: View {
             .disabled(!hasPhoto)
             .accessibilityLabel("查看图片信息")
 
+            Button(action: onUndo) {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(canUndo ? GrainTheme.paper : GrainTheme.muted.opacity(0.38))
+                    .frame(width: 38, height: 38)
+                    .background(GrainTheme.raised, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canUndo)
+            .accessibilityLabel("撤销上一步")
+
             Button(action: onExport) {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 14, weight: .bold))
@@ -205,12 +253,17 @@ private struct EditorWorkspace: View {
     let showHistogram: Bool
     @State private var showCropEditor = false
     @State private var editingTextID: UUID?
+    @State private var selectedTextID: UUID?
     @State private var showTextEditor = false
 
     var body: some View {
         VStack(spacing: 0) {
-            PhotoEditorCanvas(showHistogram: showHistogram) { id in
+            PhotoEditorCanvas(
+                showHistogram: showHistogram,
+                selectedTextID: $selectedTextID
+            ) { id in
                 editingTextID = id
+                selectedTextID = id
                 showTextEditor = true
             }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -221,7 +274,9 @@ private struct EditorWorkspace: View {
             AdjustPanel(
                 onCrop: { showCropEditor = true },
                 onAddText: {
-                    editingTextID = editor.addTextOverlay()
+                    let id = editor.addTextOverlay()
+                    editingTextID = id
+                    selectedTextID = id
                     showTextEditor = true
                 }
             )
@@ -245,6 +300,7 @@ private struct EditorWorkspace: View {
 private struct PhotoEditorCanvas: View {
     @EnvironmentObject private var editor: EditorViewModel
     let showHistogram: Bool
+    @Binding var selectedTextID: UUID?
     let onEditText: (UUID) -> Void
     @State private var showOriginal = false
     @State private var showFullscreen = false
@@ -267,42 +323,39 @@ private struct PhotoEditorCanvas: View {
                             .resizable()
                             .scaledToFit()
                             .transition(.opacity)
+                            .onTapGesture {
+                                selectedTextID = nil
+                                showFullscreen = true
+                            }
                     } else {
                         ProgressView()
                             .tint(GrainTheme.paper)
                     }
 
                     ForEach(editor.textOverlays) { overlay in
-                        let fontSize = max(10, min(proxy.size.width, imageHeight) * overlay.fontSize)
-                        Text(overlay.text.isEmpty ? " " : overlay.text)
-                            .font(overlay.font.swiftUIFont(size: fontSize))
-                            .foregroundStyle(
-                                Color(
-                                    red: overlay.red,
-                                    green: overlay.green,
-                                    blue: overlay.blue,
-                                    opacity: overlay.alpha
-                                )
-                            )
-                            .multilineTextAlignment(.center)
-                            .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
-                            .position(
-                                x: overlay.x * proxy.size.width,
-                                y: overlay.y * imageHeight
-                            )
-                            .gesture(
-                                DragGesture()
-                                    .onChanged { value in
-                                        editor.moveTextOverlay(
-                                            id: overlay.id,
-                                            x: value.location.x / max(proxy.size.width, 1),
-                                            y: value.location.y / max(imageHeight, 1)
-                                        )
-                                    }
-                            )
-                            .onTapGesture {
+                        EditableTextOverlayView(
+                            overlay: overlay,
+                            selected: selectedTextID == overlay.id,
+                            canvasSize: CGSize(width: proxy.size.width, height: imageHeight),
+                            onSelect: {
+                                selectedTextID = overlay.id
+                            },
+                            onEdit: {
                                 onEditText(overlay.id)
+                            },
+                            onDelete: {
+                                editor.deleteTextOverlay(id: overlay.id)
+                                selectedTextID = nil
+                            },
+                            onMoveStart: editor.recordUndoSnapshot,
+                            onMove: { point in
+                                editor.moveTextOverlay(
+                                    id: overlay.id,
+                                    x: point.x / max(proxy.size.width, 1),
+                                    y: point.y / max(imageHeight, 1)
+                                )
                             }
+                        )
                     }
 
                     VStack {
@@ -369,10 +422,8 @@ private struct PhotoEditorCanvas: View {
                     }
                     .padding(13)
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        showFullscreen = true
-                    }
                 }
+                .coordinateSpace(name: "photo-editor-canvas")
                 .frame(width: proxy.size.width, height: imageHeight)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -390,6 +441,87 @@ private struct PhotoEditorCanvas: View {
             return 3 / 2
         }
         return CGFloat(photo.pixelWidth) / CGFloat(photo.pixelHeight)
+    }
+}
+
+private struct EditableTextOverlayView: View {
+    let overlay: PhotoTextOverlay
+    let selected: Bool
+    let canvasSize: CGSize
+    let onSelect: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    let onMoveStart: () -> Void
+    let onMove: (CGPoint) -> Void
+    @State private var dragStarted = false
+
+    var body: some View {
+        Text(overlay.text.isEmpty ? " " : overlay.text)
+            .font(
+                overlay.font.swiftUIFont(
+                    size: max(10, min(canvasSize.width, canvasSize.height) * overlay.fontSize)
+                )
+            )
+            .foregroundStyle(
+                Color(
+                    red: overlay.red,
+                    green: overlay.green,
+                    blue: overlay.blue,
+                    opacity: overlay.alpha
+                )
+            )
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
+            .padding(6)
+            .overlay {
+                if selected {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(GrainTheme.paper.opacity(0.9), lineWidth: 0.9)
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if selected {
+                    Button(action: onDelete) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 19, height: 19)
+                            .background(Color(hex: 0xB64532), in: Circle())
+                            .overlay {
+                                Circle().stroke(Color.white.opacity(0.7), lineWidth: 0.7)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: 10, y: -10)
+                    .accessibilityLabel("删除文字")
+                }
+            }
+            .position(
+                x: overlay.x * canvasSize.width,
+                y: overlay.y * canvasSize.height
+            )
+            .gesture(
+                DragGesture(minimumDistance: 4, coordinateSpace: .named("photo-editor-canvas"))
+                    .onChanged { value in
+                        if !dragStarted {
+                            dragStarted = true
+                            onMoveStart()
+                        }
+                        onMove(value.location)
+                    }
+                    .onEnded { _ in
+                        dragStarted = false
+                    }
+            )
+            .onTapGesture {
+                if selected {
+                    onEdit()
+                } else {
+                    onSelect()
+                }
+            }
     }
 }
 
@@ -689,16 +821,21 @@ private struct FilmPresetBar: View {
                         Text("推荐")
                     }
                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(GrainTheme.accent)
+                    .foregroundStyle(editor.isRecommendationApplied ? GrainTheme.accent : GrainTheme.muted)
                     .padding(.horizontal, 9)
                     .frame(height: 24)
-                    .background(GrainTheme.accent.opacity(0.10), in: Capsule())
+                    .background(
+                        editor.isRecommendationApplied
+                            ? GrainTheme.accent.opacity(0.12)
+                            : GrainTheme.raised,
+                        in: Capsule()
+                    )
                 }
                 .buttonStyle(.plain)
                 .disabled(editor.isRecommending)
 
                 Button {
-                    editor.resetSelectedProfile()
+                    editor.resetAllAdjustments()
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 11, weight: .medium))
@@ -876,7 +1013,15 @@ private struct AdjustPanel: View {
             }
 
             HStack(spacing: 12) {
-                Slider(value: activeBinding, in: activeRange)
+                Slider(
+                    value: activeBinding,
+                    in: activeRange,
+                    onEditingChanged: { editing in
+                        if editing {
+                            editor.recordUndoSnapshot()
+                        }
+                    }
+                )
                     .tint(GrainTheme.accent)
 
                 Text(activeValueText)
@@ -910,6 +1055,7 @@ private struct AdjustPanel: View {
             get: { value(for: selectedTool) },
             set: {
                 setValue($0, for: selectedTool)
+                editor.markManualAdjustment()
                 editor.schedulePreview()
             }
         )

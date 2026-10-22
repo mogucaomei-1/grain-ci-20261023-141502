@@ -14,6 +14,8 @@ final class EditorViewModel: ObservableObject {
     @Published private(set) var histogram: RGBHistogram?
     @Published private(set) var isPreparing = false
     @Published private(set) var isRecommending = false
+    @Published private(set) var isRecommendationApplied = false
+    @Published private(set) var canUndo = false
     @Published private(set) var isExporting = false
     @Published var selectedProfile: FilmProfile = .portra
     @Published var settings: FilmSettings = FilmProfile.portra.factorySettings
@@ -31,16 +33,19 @@ final class EditorViewModel: ObservableObject {
     private var sourcePreview: CGImage?
     private var previewNeedsUpdate = false
     private var previewGeneration = 0
+    private var undoStack: [EditorSnapshot] = []
 
     var canExport: Bool {
         photo != nil && !isPreparing && !isExporting
     }
 
     func selectProfile(_ profile: FilmProfile) {
+        recordUndoSnapshot()
         withAnimation(.snappy(duration: 0.25)) {
             selectedProfile = profile
             settings = profile.factorySettings
             intensity = profile == .neutral ? 1 : 0.82
+            isRecommendationApplied = false
         }
         schedulePreview()
     }
@@ -63,18 +68,35 @@ final class EditorViewModel: ObservableObject {
         errorMessage = nil
         isPreparing = false
         isExporting = false
+        isRecommendationApplied = false
+        undoStack.removeAll()
+        canUndo = false
     }
 
     func resetSelectedProfile() {
+        recordUndoSnapshot()
         withAnimation(.snappy(duration: 0.25)) {
             settings = selectedProfile.factorySettings
             intensity = selectedProfile == .neutral ? 1 : 0.82
+            isRecommendationApplied = false
+        }
+        schedulePreview()
+    }
+
+    func resetAllAdjustments() {
+        recordUndoSnapshot()
+        withAnimation(.snappy(duration: 0.25)) {
+            selectedProfile = .neutral
+            settings = FilmProfile.neutral.factorySettings
+            intensity = 1
+            isRecommendationApplied = false
         }
         schedulePreview()
     }
 
     func recommendLook() {
         guard let originalPreview, !isRecommending else { return }
+        recordUndoSnapshot()
         isRecommending = true
 
         Task {
@@ -86,6 +108,7 @@ final class EditorViewModel: ObservableObject {
                 selectedProfile = recommendation.profile
                 settings = recommendation.settings
                 intensity = recommendation.intensity
+                isRecommendationApplied = true
             }
             schedulePreview()
             isRecommending = false
@@ -122,10 +145,12 @@ final class EditorViewModel: ObservableObject {
             return
         }
 
+        recordUndoSnapshot()
         withAnimation(.snappy(duration: 0.24)) {
             selectedProfile = preset.profile
             settings = preset.settings
             intensity = preset.intensity
+            isRecommendationApplied = false
         }
         schedulePreview()
         showNotice("已粘贴预设 · \(preset.profile.name)")
@@ -133,12 +158,15 @@ final class EditorViewModel: ObservableObject {
     }
 
     func updateCrop(_ newCrop: CropTransform) {
+        recordUndoSnapshot()
         crop = newCrop
+        isRecommendationApplied = false
         schedulePreview()
     }
 
     @discardableResult
     func addTextOverlay() -> UUID {
+        recordUndoSnapshot()
         var overlay = PhotoTextOverlay()
         overlay.y = 0.68
         textOverlays.append(overlay)
@@ -147,6 +175,7 @@ final class EditorViewModel: ObservableObject {
 
     func updateTextOverlay(_ overlay: PhotoTextOverlay) {
         guard let index = textOverlays.firstIndex(where: { $0.id == overlay.id }) else { return }
+        recordUndoSnapshot()
         textOverlays[index] = overlay
     }
 
@@ -157,7 +186,36 @@ final class EditorViewModel: ObservableObject {
     }
 
     func deleteTextOverlay(id: UUID) {
+        recordUndoSnapshot()
         textOverlays.removeAll { $0.id == id }
+    }
+
+    func markManualAdjustment() {
+        isRecommendationApplied = false
+    }
+
+    func recordUndoSnapshot() {
+        let snapshot = currentSnapshot
+        guard undoStack.last != snapshot else { return }
+        undoStack.append(snapshot)
+        if undoStack.count > 40 {
+            undoStack.removeFirst()
+        }
+        canUndo = true
+    }
+
+    func undo() {
+        guard let snapshot = undoStack.popLast() else { return }
+        withAnimation(.snappy(duration: 0.24)) {
+            selectedProfile = snapshot.profile
+            settings = snapshot.settings
+            intensity = snapshot.intensity
+            crop = snapshot.crop
+            textOverlays = snapshot.overlays
+            isRecommendationApplied = snapshot.recommendationApplied
+        }
+        canUndo = !undoStack.isEmpty
+        schedulePreview()
     }
 
     func schedulePreview() {
@@ -254,6 +312,9 @@ final class EditorViewModel: ObservableObject {
             intensity = 1
             photo = asset
             exportOptions.keepLocation = asset.hasLocation
+            undoStack.removeAll()
+            canUndo = false
+            isRecommendationApplied = false
             isPreparing = false
             schedulePreview()
 
@@ -374,4 +435,24 @@ final class EditorViewModel: ObservableObject {
             }
         }
     }
+
+    private var currentSnapshot: EditorSnapshot {
+        EditorSnapshot(
+            profile: selectedProfile,
+            settings: settings,
+            intensity: intensity,
+            crop: crop,
+            overlays: textOverlays,
+            recommendationApplied: isRecommendationApplied
+        )
+    }
+}
+
+private struct EditorSnapshot: Equatable {
+    let profile: FilmProfile
+    let settings: FilmSettings
+    let intensity: Double
+    let crop: CropTransform
+    let overlays: [PhotoTextOverlay]
+    let recommendationApplied: Bool
 }
