@@ -24,6 +24,7 @@ final class EditorViewModel: ObservableObject {
 
     private var previewTask: Task<Void, Never>?
     private var noticeTask: Task<Void, Never>?
+    private var sourcePreview: CGImage?
 
     var canExport: Bool {
         photo != nil && !isPreparing && !isExporting
@@ -42,6 +43,7 @@ final class EditorViewModel: ObservableObject {
         previewTask?.cancel()
         previewTask = nil
         photo = nil
+        sourcePreview = nil
         originalPreview = nil
         editedPreview = nil
         histogram = nil
@@ -120,32 +122,29 @@ final class EditorViewModel: ObservableObject {
     }
 
     func schedulePreview() {
-        guard let photo else { return }
+        guard let sourcePreview else { return }
         previewTask?.cancel()
         let profile = selectedProfile
         let settings = settings
         let intensity = intensity
 
         previewTask = Task {
-            try? await Task.sleep(for: .milliseconds(110))
+            try? await Task.sleep(for: .milliseconds(12))
             guard !Task.isCancelled else { return }
-            isPreparing = true
             do {
                 let rendered = try await Task.detached(priority: .userInitiated) {
-                    let images = try RawImageProcessor.renderPreview(
-                        from: photo.url,
+                    let edited = try RawImageProcessor.renderGradedPreview(
+                        source: sourcePreview,
                         profile: profile,
                         settings: settings,
                         intensity: intensity
                     )
                     return (
-                        original: images.original,
-                        edited: images.edited,
-                        histogram: LocalLookAdvisor.histogram(from: images.edited)
+                        edited: edited,
+                        histogram: LocalLookAdvisor.histogram(from: edited)
                     )
                 }.value
                 guard !Task.isCancelled else { return }
-                originalPreview = rendered.original
                 editedPreview = rendered.edited
                 histogram = rendered.histogram
             } catch {
@@ -153,7 +152,6 @@ final class EditorViewModel: ObservableObject {
                     errorMessage = error.localizedDescription
                 }
             }
-            isPreparing = false
         }
     }
 
@@ -161,6 +159,8 @@ final class EditorViewModel: ObservableObject {
         errorMessage = nil
         isPreparing = true
         exportResult = nil
+        previewTask?.cancel()
+        sourcePreview = nil
         originalPreview = nil
         editedPreview = nil
         histogram = nil
@@ -184,10 +184,30 @@ final class EditorViewModel: ObservableObject {
             let asset = try RawImageProcessor.metadata(for: localURL)
             photo = asset
             exportOptions.keepLocation = asset.hasLocation
-            schedulePreview()
+            preparePreviewSource(for: localURL)
         } catch {
             isPreparing = false
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func preparePreviewSource(for url: URL) {
+        previewTask?.cancel()
+        previewTask = Task {
+            do {
+                let source = try await Task.detached(priority: .userInitiated) {
+                    try RawImageProcessor.renderSourcePreview(from: url)
+                }.value
+                guard !Task.isCancelled else { return }
+                sourcePreview = source
+                originalPreview = source
+                isPreparing = false
+                schedulePreview()
+            } catch {
+                guard !Task.isCancelled else { return }
+                isPreparing = false
+                errorMessage = error.localizedDescription
+            }
         }
     }
 

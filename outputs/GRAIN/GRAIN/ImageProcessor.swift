@@ -75,6 +75,17 @@ struct RawImageProcessor {
         settings: FilmSettings,
         intensity: Double
     ) throws -> (original: CGImage, edited: CGImage) {
+        let original = try renderSourcePreview(from: url)
+        let edited = try renderGradedPreview(
+            source: original,
+            profile: profile,
+            settings: settings,
+            intensity: intensity
+        )
+        return (original, edited)
+    }
+
+    static func renderSourcePreview(from url: URL) throws -> CGImage {
         let image = try loadImage(from: url, draft: true)
         let normalized = normalizedExtent(of: image)
         let maxDimension = max(normalized.extent.width, normalized.extent.height)
@@ -84,20 +95,28 @@ struct RawImageProcessor {
         guard let original = context.createCGImage(preview, from: preview.extent) else {
             throw ImageProcessorError.cannotRender
         }
+        return original
+    }
 
+    static func renderGradedPreview(
+        source: CGImage,
+        profile: FilmProfile,
+        settings: FilmSettings,
+        intensity: Double
+    ) throws -> CGImage {
+        let preview = CIImage(cgImage: source)
         let graded = applyFilm(
             to: preview,
             profile: profile,
             settings: settings,
             intensity: intensity,
-            grainScale: max(1, maxDimension / 1800)
+            grainScale: 1
         )
 
         guard let edited = context.createCGImage(graded, from: preview.extent) else {
             throw ImageProcessorError.cannotRender
         }
-
-        return (original, edited)
+        return edited
     }
 
     static func export(

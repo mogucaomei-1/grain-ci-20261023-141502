@@ -106,7 +106,7 @@ struct PhotoLibraryHome: View {
     let onSelect: (PHAsset) -> Void
     @Environment(\.openURL) private var openURL
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -129,18 +129,18 @@ struct PhotoLibraryHome: View {
                 permissionView
             } else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 6) {
+                    LazyVGrid(columns: columns, spacing: 2) {
                         ForEach(library.assets, id: \.localIdentifier) { asset in
                             Button {
                                 onSelect(asset)
                             } label: {
                                 AssetThumbnail(asset: asset)
-                                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 3)
                     .padding(.bottom, 24)
                 }
                 .scrollIndicators(.hidden)
@@ -201,20 +201,24 @@ private struct AssetThumbnail: View {
     @State private var requestID: PHImageRequestID?
 
     var body: some View {
-        ZStack {
-            GrainTheme.surface
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Image(systemName: "photo")
-                    .font(.system(size: 17, weight: .light))
-                    .foregroundStyle(GrainTheme.muted.opacity(0.5))
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                ZStack {
+                    GrainTheme.surface
+                    if let image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.system(size: 17, weight: .light))
+                            .foregroundStyle(GrainTheme.muted.opacity(0.5))
+                    }
+                }
+                .clipped()
             }
-        }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(1, contentMode: .fit)
         .clipped()
         .onAppear(perform: requestThumbnail)
         .onDisappear {
