@@ -1,0 +1,17 @@
+.DS_Store
+.build/
+build/
+ci/DerivedData/
+ci/artifacts/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Never commit signing material or installable builds.
+*.cer
+*.p12
+*.mobileprovision
+*.key
+*.ipa
+*.xcarchive
+

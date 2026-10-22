@@ -1,0 +1,91 @@
+name: Build Enterprise IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_identifier:
+        description: "The explicit Bundle ID from the enterprise provisioning profile"
+        required: false
+        default: "studio.grain.rawfilm"
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enterprise-ipa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  signed-ipa:
+    name: Archive and export signed IPA
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    env:
+      PROJECT_PATH: outputs/GRAIN/GRAIN.xcodeproj
+      SCHEME: GRAIN
+      BUNDLE_ID: ${{ inputs.bundle_identifier || 'studio.grain.rawfilm' }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+      PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+      SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          sw_vers
+
+      - name: Validate signing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in APPLE_TEAM_ID BUILD_CERTIFICATE_BASE64 P12_PASSWORD PROVISIONING_PROFILE_BASE64; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error title=Missing secret::Configure repository secret $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Build and sign enterprise IPA
+        shell: bash
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          chmod +x scripts/build_enterprise_ipa.sh
+          scripts/build_enterprise_ipa.sh
+
+      - name: Upload signed IPA
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GRAIN-enterprise-ipa
+          path: |
+            ci/artifacts/*.ipa
+            ci/artifacts/build-info.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GRAIN-build-logs
+          path: |
+            ci/build/*.log
+            ci/build/export/ExportOptions.plist
+          if-no-files-found: ignore
+          retention-days: 7
+

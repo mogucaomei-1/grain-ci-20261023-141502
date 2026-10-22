@@ -1,0 +1,419 @@
+import CoreImage
+import CoreImage.CIFilterBuiltins
+import Foundation
+import ImageIO
+import UniformTypeIdentifiers
+
+enum ImageProcessorError: LocalizedError {
+    case cannotOpenFile
+    case unsupportedRAW
+    case cannotRender
+    case cannotWrite
+
+    var errorDescription: String? {
+        switch self {
+        case .cannotOpenFile:
+            "无法读取这张照片，请确认文件没有损坏。"
+        case .unsupportedRAW:
+            "当前 iOS 版本暂不能解码这个 Sony RAW 版本。请先更新系统，或导入该照片的 JPEG / HEIC 副本。"
+        case .cannotRender:
+            "图像处理没有完成，请重新尝试。"
+        case .cannotWrite:
+            "无法写入导出文件，请检查可用存储空间。"
+        }
+    }
+}
+
+struct RawImageProcessor {
+    private static let context = CIContext(options: [
+        .cacheIntermediates: false,
+        .workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB) as Any
+    ])
+
+    static func metadata(for url: URL) throws -> PhotoAsset {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        else {
+            throw ImageProcessorError.cannotOpenFile
+        }
+
+        let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
+        let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] ?? [:]
+        let gps = properties[kCGImagePropertyGPSDictionary] as? [CFString: Any]
+
+        let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let rawOrientation = properties[kCGImagePropertyOrientation] as? UInt32 ?? 1
+        let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap(Int64.init) ?? 0
+
+        let dateString = exif[kCGImagePropertyExifDateTimeOriginal] as? String
+        let date = dateString.flatMap {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+            return formatter.date(from: $0)
+        }
+
+        return PhotoAsset(
+            url: url,
+            displayName: url.deletingPathExtension().lastPathComponent,
+            pixelWidth: width,
+            pixelHeight: height,
+            fileSize: fileSize,
+            cameraMake: tiff[kCGImagePropertyTIFFMake] as? String ?? "",
+            cameraModel: tiff[kCGImagePropertyTIFFModel] as? String ?? "",
+            lensModel: exif[kCGImagePropertyExifLensModel] as? String ?? "",
+            capturedAt: date,
+            hasLocation: gps?.isEmpty == false,
+            orientation: rawOrientation
+        )
+    }
+
+    static func renderPreview(
+        from url: URL,
+        profile: FilmProfile,
+        settings: FilmSettings,
+        intensity: Double
+    ) throws -> (original: CGImage, edited: CGImage) {
+        let image = try loadImage(from: url, draft: true)
+        let normalized = normalizedExtent(of: image)
+        let maxDimension = max(normalized.extent.width, normalized.extent.height)
+        let scale = min(1, 1800 / maxDimension)
+        let preview = normalized.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+
+        guard let original = context.createCGImage(preview, from: preview.extent) else {
+            throw ImageProcessorError.cannotRender
+        }
+
+        let graded = applyFilm(
+            to: preview,
+            profile: profile,
+            settings: settings,
+            intensity: intensity,
+            grainScale: max(1, maxDimension / 1800)
+        )
+
+        guard let edited = context.createCGImage(graded, from: preview.extent) else {
+            throw ImageProcessorError.cannotRender
+        }
+
+        return (original, edited)
+    }
+
+    static func export(
+        from url: URL,
+        profile: FilmProfile,
+        settings: FilmSettings,
+        intensity: Double,
+        options: ExportOptions,
+        to outputURL: URL
+    ) throws -> ExportResult {
+        return try autoreleasepool {
+            let image = try loadImage(from: url, draft: false)
+            let normalized = normalizedExtent(of: image)
+            let maxDimension = max(normalized.extent.width, normalized.extent.height)
+            let graded = applyFilm(
+                to: normalized,
+                profile: profile,
+                settings: settings,
+                intensity: intensity,
+                grainScale: max(1, maxDimension / 1800)
+            )
+
+            let displayP3 = CGColorSpace(name: CGColorSpace.displayP3)
+            guard let cgImage = context.createCGImage(
+                graded,
+                from: normalized.extent,
+                format: .RGBA8,
+                colorSpace: displayP3
+            ) else {
+                throw ImageProcessorError.cannotRender
+            }
+
+            var actualFormat = options.format
+            var destination = CGImageDestinationCreateWithURL(
+                outputURL as CFURL,
+                actualFormat.typeIdentifier,
+                1,
+                nil
+            )
+
+            if destination == nil, actualFormat == .heic {
+                actualFormat = .jpeg
+                let fallbackURL = outputURL.deletingPathExtension().appendingPathExtension("jpg")
+                if FileManager.default.fileExists(atPath: fallbackURL.path) {
+                    try FileManager.default.removeItem(at: fallbackURL)
+                }
+                destination = CGImageDestinationCreateWithURL(
+                    fallbackURL as CFURL,
+                    actualFormat.typeIdentifier,
+                    1,
+                    nil
+                )
+                guard destination != nil else { throw ImageProcessorError.cannotWrite }
+                let properties = exportProperties(
+                    sourceURL: url,
+                    keepLocation: options.keepLocation,
+                    keepCameraMetadata: options.keepCameraMetadata,
+                    width: cgImage.width,
+                    height: cgImage.height,
+                    quality: options.quality
+                )
+                CGImageDestinationAddImage(destination!, cgImage, properties as CFDictionary)
+                guard CGImageDestinationFinalize(destination!) else {
+                    throw ImageProcessorError.cannotWrite
+                }
+                return ExportResult(
+                    url: fallbackURL,
+                    dimensions: "\(cgImage.width) × \(cgImage.height)",
+                    format: actualFormat
+                )
+            }
+
+            guard let destination else { throw ImageProcessorError.cannotWrite }
+            let properties = exportProperties(
+                sourceURL: url,
+                keepLocation: options.keepLocation,
+                keepCameraMetadata: options.keepCameraMetadata,
+                width: cgImage.width,
+                height: cgImage.height,
+                quality: options.quality
+            )
+            CGImageDestinationAddImage(destination, cgImage, properties as CFDictionary)
+            guard CGImageDestinationFinalize(destination) else {
+                throw ImageProcessorError.cannotWrite
+            }
+
+            return ExportResult(
+                url: outputURL,
+                dimensions: "\(cgImage.width) × \(cgImage.height)",
+                format: actualFormat
+            )
+        }
+    }
+
+    private static func loadImage(from url: URL, draft: Bool) throws -> CIImage {
+        if let rawFilter = CIRAWFilter(imageURL: url) {
+            rawFilter.isDraftModeEnabled = draft
+            if rawFilter.isLensCorrectionSupported {
+                rawFilter.isLensCorrectionEnabled = true
+            }
+            if rawFilter.isLocalToneMapSupported {
+                rawFilter.localToneMapAmount = 0.42
+            }
+            if rawFilter.isSharpnessSupported {
+                rawFilter.sharpnessAmount = 0.24
+            }
+            if let output = rawFilter.outputImage {
+                return output
+            }
+            // A recognized RAW container must not silently fall back to its embedded
+            // JPEG preview, because that would make a low-resolution "full-size" export.
+            throw ImageProcessorError.unsupportedRAW
+        }
+
+        let rawExtensions = ["arw", "srf", "sr2", "dng"]
+        if rawExtensions.contains(url.pathExtension.lowercased()) {
+            throw ImageProcessorError.unsupportedRAW
+        }
+
+        let fallback = CIImage(
+            contentsOf: url,
+            options: [.applyOrientationProperty: true]
+        )
+        guard let fallback else {
+            throw ImageProcessorError.unsupportedRAW
+        }
+        return fallback
+    }
+
+    private static func normalizedExtent(of image: CIImage) -> CIImage {
+        let extent = image.extent
+        guard extent.minX != 0 || extent.minY != 0 else { return image }
+        return image.transformed(
+            by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY)
+        )
+    }
+
+    private static func applyFilm(
+        to input: CIImage,
+        profile: FilmProfile,
+        settings: FilmSettings,
+        intensity: Double,
+        grainScale: Double
+    ) -> CIImage {
+        let amount = min(max(intensity, 0), 1)
+        let extent = input.extent
+        let source = input.clampedToExtent()
+
+        var graded = blend(base: source, with: neutralize(source, profile: profile), amount: amount)
+
+        graded = graded.applyingFilter("CIExposureAdjust", parameters: [
+            kCIInputEVKey: settings.exposure * amount
+        ])
+
+        let targetTemperature = 6500 + (settings.temperature - 6500) * amount
+        graded = graded.applyingFilter("CITemperatureAndTint", parameters: [
+            "inputNeutral": CIVector(x: 6500, y: 0),
+            "inputTargetNeutral": CIVector(x: targetTemperature, y: settings.tint * amount)
+        ])
+
+        let fade = min(max(settings.fade * amount, 0), 0.30)
+        graded = graded.applyingFilter("CIToneCurve", parameters: [
+            "inputPoint0": CIVector(x: 0, y: fade),
+            "inputPoint1": CIVector(x: 0.25, y: 0.25 + fade * 0.35),
+            "inputPoint2": CIVector(x: 0.50, y: 0.50),
+            "inputPoint3": CIVector(x: 0.75, y: 0.75 - fade * 0.20),
+            "inputPoint4": CIVector(x: 1, y: 1)
+        ])
+
+        let contrast = 1 + (settings.contrast - 1) * amount
+        let saturation = 1 + (settings.saturation - 1) * amount
+        graded = graded.applyingFilter("CIColorControls", parameters: [
+            kCIInputContrastKey: contrast,
+            kCIInputSaturationKey: saturation,
+            kCIInputBrightnessKey: 0
+        ])
+
+        if profile == .classicChrome {
+            graded = graded.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.96, y: 0.02, z: 0.02, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 0.98, z: 0.04, w: 0),
+                "inputBVector": CIVector(x: 0.01, y: 0.06, z: 0.98, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        } else if profile == .pro400h {
+            graded = graded.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.98, y: 0.02, z: 0.02, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.02, z: 0.03, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.01, z: 1.01, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        }
+
+        if profile == .hp5 {
+            graded = graded.applyingFilter("CIPhotoEffectMono")
+                .applyingFilter("CIColorMatrix", parameters: [
+                    "inputRVector": CIVector(x: 1.02, y: 0.99, z: 0.93, w: 0),
+                    "inputGVector": CIVector(x: 1.02, y: 0.99, z: 0.93, w: 0),
+                    "inputBVector": CIVector(x: 1.02, y: 0.99, z: 0.93, w: 0),
+                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+                ])
+        }
+
+        let vignette = settings.vignette * amount
+        if vignette > 0.001 {
+            graded = graded.applyingFilter("CIVignette", parameters: [
+                kCIInputIntensityKey: vignette * 1.8,
+                kCIInputRadiusKey: min(extent.width, extent.height) * 0.62
+            ])
+        }
+
+        let grain = settings.grain * amount
+        if grain > 0.001, let random = CIFilter(name: "CIRandomGenerator")?.outputImage {
+            let noise = random
+                .transformed(by: CGAffineTransform(scaleX: grainScale, y: grainScale))
+                .applyingFilter("CIColorMatrix", parameters: [
+                    "inputRVector": CIVector(x: 0.30, y: 0.30, z: 0.30, w: 0),
+                    "inputGVector": CIVector(x: 0.30, y: 0.30, z: 0.30, w: 0),
+                    "inputBVector": CIVector(x: 0.30, y: 0.30, z: 0.30, w: 0),
+                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: grain * 0.32)
+                ])
+                .cropped(to: extent)
+            graded = noise.applyingFilter("CISoftLightBlendMode", parameters: [
+                kCIInputBackgroundImageKey: graded
+            ])
+        }
+
+        return graded
+            .cropped(to: extent)
+            .applyingFilter("CIColorClamp")
+    }
+
+    private static func neutralize(_ image: CIImage, profile: FilmProfile) -> CIImage {
+        switch profile {
+        case .neutral:
+            return image
+        case .gold:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.04, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.00, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.01, z: 0.94, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .cinestill:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.92, y: 0, z: 0.04, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 0.98, z: 0.04, w: 0),
+                "inputBVector": CIVector(x: 0.02, y: 0.06, z: 1.08, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .portra:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.03, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 0.99, z: 0.01, w: 0),
+                "inputBVector": CIVector(x: 0.01, y: 0.01, z: 0.96, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        default:
+            return image
+        }
+    }
+
+    private static func blend(base: CIImage, with image: CIImage, amount: Double) -> CIImage {
+        guard amount < 0.999 else { return image }
+        return image.applyingFilter("CIDissolveTransition", parameters: [
+            kCIInputTargetImageKey: base,
+            kCIInputTimeKey: amount
+        ])
+    }
+
+    private static func exportProperties(
+        sourceURL: URL,
+        keepLocation: Bool,
+        keepCameraMetadata: Bool,
+        width: Int,
+        height: Int,
+        quality: Double
+    ) -> [CFString: Any] {
+        var properties: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: min(max(quality, 0.7), 1.0),
+            kCGImagePropertyOrientation: 1,
+            kCGImagePropertyPixelWidth: width,
+            kCGImagePropertyPixelHeight: height,
+            kCGImageDestinationEmbedThumbnail: true
+        ]
+
+        guard keepCameraMetadata,
+              let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
+              let sourceProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        else {
+            return properties
+        }
+
+        if let exif = sourceProperties[kCGImagePropertyExifDictionary] as? [CFString: Any] {
+            var clean = exif
+            clean[kCGImagePropertyExifPixelXDimension] = width
+            clean[kCGImagePropertyExifPixelYDimension] = height
+            properties[kCGImagePropertyExifDictionary] = clean
+        }
+
+        if let tiff = sourceProperties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
+            properties[kCGImagePropertyTIFFDictionary] = tiff
+        }
+        if var iptc = sourceProperties[kCGImagePropertyIPTCDictionary] as? [CFString: Any] {
+            if !keepLocation {
+                iptc.removeValue(forKey: kCGImagePropertyIPTCExtLocationGPSLatitude)
+                iptc.removeValue(forKey: kCGImagePropertyIPTCExtLocationGPSLongitude)
+                iptc.removeValue(forKey: kCGImagePropertyIPTCExtRatingRegionGPSLatitude)
+                iptc.removeValue(forKey: kCGImagePropertyIPTCExtRatingRegionGPSLongitude)
+            }
+            properties[kCGImagePropertyIPTCDictionary] = iptc
+        }
+        if keepLocation, let gps = sourceProperties[kCGImagePropertyGPSDictionary] as? [CFString: Any] {
+            properties[kCGImagePropertyGPSDictionary] = gps
+        }
+
+        return properties
+    }
+}

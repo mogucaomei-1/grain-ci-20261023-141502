@@ -1,0 +1,48 @@
+# GRAIN — Sony RAW 胶片工作台
+
+GRAIN 是一个面向 iPhone 的 SwiftUI RAW 调色 App MVP。主流程围绕 Sony ARW 导入、胶片色彩模拟、原尺寸高质量导出和 GPS 隐私开关设计。
+
+## 打开方式
+
+1. 用 Xcode 16 或更高版本打开 `GRAIN.xcodeproj`。
+2. 在 `Signing & Capabilities` 中选择自己的开发团队。
+3. 如需改 Bundle Identifier，替换 `studio.grain.rawfilm`。
+4. 选择 iPhone 17 Pro 模拟器或真机运行。
+
+当前制作环境没有安装完整 Xcode/iOS SDK，因此已完成项目结构校验、Swift 语法检查和 Core Image 核心代码的 macOS SDK 类型检查，但不能在这里生成 `.app` 或运行 iPhone 模拟器。
+
+## 已实现
+
+- 通过 `CIRAWFilter` 解码 Sony ARW；照片图库和“文件” App 两条导入路径。
+- 预览固定渲染约 1800 px 长边，避免每次拖动参数都解码整张高像素 RAW。
+- 导出时重新从 RAW 读取全尺寸图像，默认保持原始像素，不提供隐式缩小。
+- 默认 HEIC，质量 100%；可切换 JPEG，质量 100%；HEIC 不可用时自动回退 JPEG。
+- 输出 Display P3，保留相机、镜头、拍摄时间等 EXIF/TIFF 字段。
+- “保留地址信息”开关控制 GPS 字典及 IPTC 位置字段，关闭后不会写入导出文件。
+- 七套非破坏性色彩配方：RAW Neutral、Portra 400、Pro 400H、Gold 200、Classic Chrome、CineStill 800T、HP5 Plus。
+- 可调曝光、色温、对比、饱和度、褪色、颗粒、暗角和配方强度。
+- 原片/调色拖动对比、相机与原始像素信息、导出结果分享。
+
+## 关键文件
+
+- `GRAIN/ImageProcessor.swift`：RAW 解码、预览、色彩管线、全尺寸导出和元数据策略。
+- `GRAIN/Models.swift`：照片模型、七套胶片配方与导出参数。
+- `GRAIN/EditorViewModel.swift`：导入、后台预览、取消旧任务和导出状态。
+- `GRAIN/Views.swift`：编辑、胶片库、导出三个主界面。
+- `GRAIN/PhotosImporter.swift`：保留原始文件表示方式的照片图库导入器。
+
+## Sony RAW 兼容性
+
+Sony ARW 的实际解码能力由 iOS/macOS 自带的 Core Image RAW 管线决定，而不是 App 自建解码器。多数主流 Sony 机身已获支持，但非常新的机型、部分压缩 RAW 变体或新固件可能要求更新 iOS。工程会在无法解码时显示明确错误，不会把缩略图冒充全尺寸输出。
+
+正式上架前建议加入一份目标机身清单做回归测试，例如 A7 IV、A7R V、A7C II、A1 II 和 FX3，并使用未压缩、无损压缩及有损压缩 ARW 各测一张。
+
+## 定位与元数据说明
+
+从“文件” App 导入时最容易完整保留 RAW 自身的 EXIF/GPS。通过系统照片选择器导入时，定位是否仍在源文件中取决于 iOS 返回的资产副本与用户授权。
+
+关闭地址信息会移除 GPS 主字典，并清理 IPTC 中常见的位置字段；相机、镜头、快门、光圈、ISO 与拍摄时间仍可保留。
+
+## 产出边界
+
+这是可继续开发的 MVP 源码，不是已经签名上架的 App。需要完整 Xcode 环境完成最终编译、真机 RAW 样本测试、App Store 隐私清单和应用图标尺寸校验。

@@ -1,0 +1,48 @@
+name: Validate iOS Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-without-signing:
+    name: Compile for iOS Simulator
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Compile
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci
+          xcodebuild \
+            -project outputs/GRAIN/GRAIN.xcodeproj \
+            -scheme GRAIN \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath ci/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tee ci/unsigned-build.log
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GRAIN-unsigned-build-log
+          path: ci/unsigned-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
