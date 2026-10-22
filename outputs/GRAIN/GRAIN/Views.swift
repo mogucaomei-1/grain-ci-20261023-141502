@@ -19,8 +19,6 @@ struct RootView: View {
                     hasPhoto: editor.photo != nil,
                     onFiles: { showDocumentPicker = true },
                     onInfo: { showInfoSheet = true },
-                    canUndo: editor.canUndo,
-                    onUndo: editor.undo,
                     histogramVisible: showHistogram,
                     onToggleHistogram: {
                         withAnimation(.easeOut(duration: 0.18)) {
@@ -34,30 +32,27 @@ struct RootView: View {
                 )
 
                 ZStack {
-                    if editor.photo == nil {
-                        PhotoLibraryHome(library: photoLibrary) { asset in
-                            importLibraryAsset(asset)
-                        }
-                        .transition(
-                            .asymmetric(
-                                insertion: .move(edge: .leading).combined(with: .opacity),
-                                removal: .move(edge: .leading).combined(with: .opacity)
-                            )
-                        )
-                    } else {
+                    PhotoLibraryHome(library: photoLibrary) { asset in
+                        importLibraryAsset(asset)
+                    }
+                    .allowsHitTesting(editor.photo == nil)
+                    .accessibilityHidden(editor.photo != nil)
+
+                    if editor.photo != nil {
                         EditorWorkspace(showHistogram: showHistogram)
                             .offset(x: editorSwipeOffset)
-                            .scaleEffect(1 - min(editorSwipeOffset / 1800, 0.035))
                             .transition(
                                 .asymmetric(
-                                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                                    removal: .move(edge: .trailing).combined(with: .opacity)
+                                    insertion: .move(edge: .trailing),
+                                    removal: .move(edge: .trailing)
                                 )
                             )
+                            .zIndex(1)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .animation(.spring(response: 0.42, dampingFraction: 0.88), value: editor.photo?.id)
+                .clipped()
+                .animation(.spring(response: 0.28, dampingFraction: 0.92, blendDuration: 0.08), value: editor.photo?.id)
             }
         }
         .sheet(isPresented: $showDocumentPicker) {
@@ -139,12 +134,12 @@ struct RootView: View {
                                 let horizontal = value.translation.width
                                 let vertical = abs(value.translation.height)
                                 if horizontal > 72 || value.predictedEndTranslation.width > 150 {
-                                    withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+                                    withAnimation(.spring(response: 0.27, dampingFraction: 0.92, blendDuration: 0.06)) {
                                         editor.returnHome()
                                         editorSwipeOffset = 0
                                     }
                                 } else {
-                                    withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                                    withAnimation(.spring(response: 0.23, dampingFraction: 0.92, blendDuration: 0.05)) {
                                         editorSwipeOffset = 0
                                     }
                                 }
@@ -171,8 +166,6 @@ private struct MinimalTopBar: View {
     let hasPhoto: Bool
     let onFiles: () -> Void
     let onInfo: () -> Void
-    let canUndo: Bool
-    let onUndo: () -> Void
     let histogramVisible: Bool
     let onToggleHistogram: () -> Void
     let onExport: () -> Void
@@ -220,17 +213,6 @@ private struct MinimalTopBar: View {
             .buttonStyle(.plain)
             .disabled(!hasPhoto)
             .accessibilityLabel("查看图片信息")
-
-            Button(action: onUndo) {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(canUndo ? GrainTheme.paper : GrainTheme.muted.opacity(0.38))
-                    .frame(width: 38, height: 38)
-                    .background(GrainTheme.raised, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .disabled(!canUndo)
-            .accessibilityLabel("撤销上一步")
 
             Button(action: onExport) {
                 Image(systemName: "arrow.up")
@@ -453,75 +435,88 @@ private struct EditableTextOverlayView: View {
     let onDelete: () -> Void
     let onMoveStart: () -> Void
     let onMove: (CGPoint) -> Void
-    @State private var dragStarted = false
+    @State private var dragOrigin: CGPoint?
 
     var body: some View {
-        Text(overlay.text.isEmpty ? " " : overlay.text)
-            .font(
-                overlay.font.swiftUIFont(
-                    size: max(10, min(canvasSize.width, canvasSize.height) * overlay.fontSize)
+        ZStack(alignment: .topTrailing) {
+            Text(overlay.text.isEmpty ? " " : overlay.text)
+                .font(
+                    overlay.font.swiftUIFont(
+                        size: max(10, min(canvasSize.width, canvasSize.height) * overlay.fontSize)
+                    )
                 )
-            )
-            .foregroundStyle(
-                Color(
-                    red: overlay.red,
-                    green: overlay.green,
-                    blue: overlay.blue,
-                    opacity: overlay.alpha
+                .foregroundStyle(
+                    Color(
+                        red: overlay.red,
+                        green: overlay.green,
+                        blue: overlay.blue,
+                        opacity: overlay.alpha
+                    )
                 )
-            )
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
-            .padding(6)
-            .overlay {
-                if selected {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(GrainTheme.paper.opacity(0.9), lineWidth: 0.9)
-                        .allowsHitTesting(false)
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if selected {
-                    Button(action: onDelete) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 19, height: 19)
-                            .background(Color(hex: 0xB64532), in: Circle())
-                            .overlay {
-                                Circle().stroke(Color.white.opacity(0.7), lineWidth: 0.7)
-                            }
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
+                .padding(9)
+                .overlay {
+                    if selected {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .stroke(GrainTheme.paper.opacity(0.9), lineWidth: 0.9)
+                            .allowsHitTesting(false)
                     }
-                    .buttonStyle(.plain)
-                    .offset(x: 10, y: -10)
-                    .accessibilityLabel("删除文字")
                 }
-            }
-            .position(
-                x: overlay.x * canvasSize.width,
-                y: overlay.y * canvasSize.height
-            )
-            .gesture(
-                DragGesture(minimumDistance: 4, coordinateSpace: .named("photo-editor-canvas"))
-                    .onChanged { value in
-                        if !dragStarted {
-                            dragStarted = true
-                            onMoveStart()
+
+            if selected {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(Color(hex: 0xB64532), in: Circle())
+                        .overlay {
+                            Circle().stroke(Color.white.opacity(0.75), lineWidth: 0.7)
                         }
-                        onMove(value.location)
-                    }
-                    .onEnded { _ in
-                        dragStarted = false
-                    }
-            )
-            .onTapGesture {
-                if selected {
-                    onEdit()
-                } else {
-                    onSelect()
                 }
+                .buttonStyle(.plain)
+                .padding(1)
+                .accessibilityLabel("删除文字")
+                .zIndex(3)
             }
+        }
+        .contentShape(Rectangle())
+        .position(
+            x: overlay.x * canvasSize.width,
+            y: overlay.y * canvasSize.height
+        )
+        .gesture(
+            DragGesture(minimumDistance: 4, coordinateSpace: .named("photo-editor-canvas"))
+                .onChanged { value in
+                    if dragOrigin == nil {
+                        dragOrigin = CGPoint(
+                            x: overlay.x * canvasSize.width,
+                            y: overlay.y * canvasSize.height
+                        )
+                        onMoveStart()
+                    }
+                    guard let origin = dragOrigin else { return }
+                    onMove(
+                        CGPoint(
+                            x: origin.x + value.translation.width,
+                            y: origin.y + value.translation.height
+                        )
+                    )
+                }
+                .onEnded { _ in
+                    dragOrigin = nil
+                }
+        )
+        .onTapGesture {
+            if selected {
+                onEdit()
+            } else {
+                onSelect()
+            }
+        }
+        .zIndex(selected ? 2 : 1)
     }
 }
 
@@ -780,6 +775,19 @@ private struct FilmPresetBar: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Spacer()
+
+                Button {
+                    editor.undo()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(editor.canUndo ? GrainTheme.paper : GrainTheme.muted.opacity(0.38))
+                        .frame(width: 27, height: 24)
+                        .background(GrainTheme.raised, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(!editor.canUndo)
+                .accessibilityLabel("撤销上一步")
 
                 Button {
                     editor.copyPreset()

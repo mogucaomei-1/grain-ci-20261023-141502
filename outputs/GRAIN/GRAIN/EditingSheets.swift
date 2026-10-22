@@ -27,7 +27,11 @@ struct TextOverlayEditorView: View {
                     }
                     .buttonStyle(.plain)
                     Button {
-                        editor.updateTextOverlay(draft)
+                        if draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            editor.deleteTextOverlay(id: overlayID)
+                        } else {
+                            editor.updateTextOverlay(draft)
+                        }
                         dismiss()
                     } label: {
                         Text("完成")
@@ -40,17 +44,28 @@ struct TextOverlayEditorView: View {
                     .buttonStyle(.plain)
                 }
 
-                TextEditor(text: $draft.text)
-                    .font(.system(size: 18, weight: .medium, design: .rounded))
-                    .foregroundStyle(GrainTheme.paper)
-                    .scrollContentBackground(.hidden)
-                    .padding(10)
-                    .frame(height: 105)
-                    .background(GrainTheme.surface, in: RoundedRectangle(cornerRadius: 15))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 15)
-                            .stroke(GrainTheme.line, lineWidth: 1)
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $draft.text)
+                        .font(.system(size: 18, weight: .medium, design: .rounded))
+                        .foregroundStyle(GrainTheme.paper)
+                        .scrollContentBackground(.hidden)
+                        .padding(10)
+
+                    if draft.text.isEmpty {
+                        Text("输入文字")
+                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                            .foregroundStyle(GrainTheme.muted.opacity(0.46))
+                            .padding(.horizontal, 15)
+                            .padding(.vertical, 18)
+                            .allowsHitTesting(false)
                     }
+                }
+                .frame(height: 105)
+                .background(GrainTheme.surface, in: RoundedRectangle(cornerRadius: 15))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(GrainTheme.line, lineWidth: 1)
+                }
 
                 HStack(spacing: 8) {
                     ForEach(PhotoTextFont.allCases) { font in

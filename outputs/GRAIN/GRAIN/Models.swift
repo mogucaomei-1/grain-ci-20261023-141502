@@ -323,7 +323,7 @@ enum PhotoTextFont: String, CaseIterable, Identifiable, Codable, Sendable {
 
 struct PhotoTextOverlay: Identifiable, Equatable, Codable, Sendable {
     var id = UUID()
-    var text = "输入文字"
+    var text = ""
     var x = 0.5
     var y = 0.5
     var fontSize = 0.07
