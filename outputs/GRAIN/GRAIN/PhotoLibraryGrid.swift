@@ -160,6 +160,14 @@ private enum PhotoLibraryAssetLoader {
     }
 }
 
+private struct PhotoTileFramePreferenceKey: PreferenceKey {
+    static let defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
 struct PhotoLibraryHome: View {
     @ObservedObject var library: PhotoLibraryViewModel
     let onSelect: (PHAsset) -> Void
@@ -170,6 +178,8 @@ struct PhotoLibraryHome: View {
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
     @State private var deleteError: String?
+    @State private var tileFrames: [String: CGRect] = [:]
+    @State private var lastSelectionDragPoint: CGPoint?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 3), count: 3)
 
@@ -202,6 +212,11 @@ struct PhotoLibraryHome: View {
                     }
                     .padding(.horizontal, 4)
                     .padding(.bottom, 24)
+                    .coordinateSpace(name: "photo-library-grid")
+                    .onPreferenceChange(PhotoTileFramePreferenceKey.self) {
+                        tileFrames = $0
+                    }
+                    .simultaneousGesture(selectionDragGesture)
                 }
                 .scrollIndicators(.hidden)
                 .refreshable {
@@ -271,19 +286,6 @@ struct PhotoLibraryHome: View {
 
             Spacer()
 
-            Button(allAssetsSelected ? "取消全选" : "全选") {
-                if allAssetsSelected {
-                    selectedIdentifiers.removeAll()
-                } else {
-                    selectedIdentifiers = Set(library.assets.map(\.localIdentifier))
-                }
-                GrainHaptics.selection(enabled: hapticsEnabled)
-            }
-            .font(.system(size: 10, weight: .semibold, design: .rounded))
-            .foregroundStyle(GrainTheme.muted)
-            .buttonStyle(.plain)
-            .disabled(!allAssetsSelected && library.assets.isEmpty)
-
             Button {
                 showDeleteConfirmation = true
             } label: {
@@ -302,11 +304,6 @@ struct PhotoLibraryHome: View {
         .padding(.horizontal, 12)
         .padding(.top, 3)
         .padding(.bottom, 5)
-    }
-
-    private var allAssetsSelected: Bool {
-        !library.assets.isEmpty
-            && selectedIdentifiers.count == library.assets.count
     }
 
     private var statusText: String {
@@ -346,6 +343,18 @@ struct PhotoLibraryHome: View {
         .aspectRatio(1, contentMode: .fit)
         .contentShape(Rectangle())
         .gesture(libraryTileGesture(asset))
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: PhotoTileFramePreferenceKey.self,
+                    value: [
+                        asset.localIdentifier: proxy.frame(
+                            in: .named("photo-library-grid")
+                        )
+                    ]
+                )
+            }
+        }
         .accessibilityLabel(
             isSelecting
                 ? (selected ? "已选中照片" : "未选中照片")
@@ -377,6 +386,51 @@ struct PhotoLibraryHome: View {
                     GrainHaptics.mediumImpact(enabled: hapticsEnabled)
                 }
             }
+    }
+
+    private var selectionDragGesture: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .named("photo-library-grid"))
+            .onChanged { value in
+                guard isSelecting,
+                      !library.isDownloadingOriginal,
+                      !isDeleting
+                else { return }
+
+                let start = lastSelectionDragPoint ?? value.location
+                selectTiles(along: start, end: value.location)
+                lastSelectionDragPoint = value.location
+            }
+            .onEnded { _ in
+                lastSelectionDragPoint = nil
+            }
+    }
+
+    private func selectTiles(along start: CGPoint, end: CGPoint) {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let distance = hypot(dx, dy)
+        let stepCount = max(1, Int(ceil(distance / 10)))
+        var didAddSelection = false
+
+        for step in 0...stepCount {
+            let progress = CGFloat(step) / CGFloat(stepCount)
+            let point = CGPoint(
+                x: start.x + dx * progress,
+                y: start.y + dy * progress
+            )
+            guard let identifier = tileFrames.first(where: {
+                $0.value.contains(point)
+            })?.key else {
+                continue
+            }
+            if selectedIdentifiers.insert(identifier).inserted {
+                didAddSelection = true
+            }
+        }
+
+        if didAddSelection {
+            GrainHaptics.selection(enabled: hapticsEnabled)
+        }
     }
 
     private func toggleSelection(_ asset: PHAsset) {
