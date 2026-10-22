@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var editor: EditorViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var photoLibrary = PhotoLibraryViewModel()
     @AppStorage("showHistogram") private var showHistogram = true
     @State private var showDocumentPicker = false
@@ -139,6 +140,9 @@ struct RootView: View {
                                         editor.returnHome()
                                         editorSwipeOffset = 0
                                     }
+                                    Task {
+                                        await photoLibrary.refresh()
+                                    }
                                 } else {
                                     withAnimation(.spring(response: 0.23, dampingFraction: 0.92, blendDuration: 0.05)) {
                                         editorSwipeOffset = 0
@@ -147,6 +151,13 @@ struct RootView: View {
                             }
                     )
                     .accessibilityLabel("右滑返回照片图库")
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task {
+                    await photoLibrary.refresh()
+                }
             }
         }
     }

@@ -3,12 +3,23 @@ import SwiftUI
 import UIKit
 
 @MainActor
-final class PhotoLibraryViewModel: ObservableObject {
+final class PhotoLibraryViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserver {
     @Published private(set) var assets: [PHAsset] = []
     @Published private(set) var isLoading = false
     @Published private(set) var accessDenied = false
     @Published private(set) var isDownloadingOriginal = false
     private var hasLoaded = false
+
+    override init() {
+        super.init()
+        PHPhotoLibrary.shared().register(self)
+    }
+
+    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
+        Task { @MainActor [weak self] in
+            await self?.refresh()
+        }
+    }
 
     func loadIfNeeded() async {
         guard !hasLoaded else { return }
