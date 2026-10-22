@@ -9,6 +9,7 @@ import UIKit
 final class EditorViewModel: ObservableObject {
     @Published private(set) var photo: PhotoAsset?
     @Published private(set) var originalPreview: CGImage?
+    @Published private(set) var fullGradedPreview: CGImage?
     @Published private(set) var editedPreview: CGImage?
     @Published private(set) var histogram: RGBHistogram?
     @Published private(set) var isPreparing = false
@@ -18,6 +19,8 @@ final class EditorViewModel: ObservableObject {
     @Published var settings: FilmSettings = FilmProfile.portra.factorySettings
     @Published var intensity = 0.82
     @Published var exportOptions = ExportOptions()
+    @Published var crop = CropTransform.identity
+    @Published var textOverlays: [PhotoTextOverlay] = []
     @Published var errorMessage: String?
     @Published var exportResult: ExportResult?
     @Published var noticeMessage: String?
@@ -49,8 +52,11 @@ final class EditorViewModel: ObservableObject {
         photo = nil
         sourcePreview = nil
         originalPreview = nil
+        fullGradedPreview = nil
         editedPreview = nil
         histogram = nil
+        crop = .identity
+        textOverlays = []
         exportResult = nil
         errorMessage = nil
         isPreparing = false
@@ -132,6 +138,34 @@ final class EditorViewModel: ObservableObject {
 #endif
     }
 
+    func updateCrop(_ newCrop: CropTransform) {
+        crop = newCrop
+        schedulePreview()
+    }
+
+    @discardableResult
+    func addTextOverlay() -> UUID {
+        var overlay = PhotoTextOverlay()
+        overlay.y = 0.68
+        textOverlays.append(overlay)
+        return overlay.id
+    }
+
+    func updateTextOverlay(_ overlay: PhotoTextOverlay) {
+        guard let index = textOverlays.firstIndex(where: { $0.id == overlay.id }) else { return }
+        textOverlays[index] = overlay
+    }
+
+    func moveTextOverlay(id: UUID, x: Double, y: Double) {
+        guard let index = textOverlays.firstIndex(where: { $0.id == id }) else { return }
+        textOverlays[index].x = min(max(x, 0.04), 0.96)
+        textOverlays[index].y = min(max(y, 0.04), 0.96)
+    }
+
+    func deleteTextOverlay(id: UUID) {
+        textOverlays.removeAll { $0.id == id }
+    }
+
     func schedulePreview() {
         guard sourcePreview != nil else { return }
         previewNeedsUpdate = true
@@ -147,6 +181,7 @@ final class EditorViewModel: ObservableObject {
                 let settings = self.settings
                 let intensity = self.intensity
                 let suppressVignette = self.photo?.isLikelyScreenshot ?? false
+                let crop = self.crop
 
                 do {
                     let rendered = try await Task.detached(priority: .userInitiated) {
@@ -157,12 +192,15 @@ final class EditorViewModel: ObservableObject {
                             intensity: intensity,
                             suppressVignette: suppressVignette
                         )
+                        let cropped = CropProcessor.apply(crop, to: edited)
                         return (
-                            edited: edited,
-                            histogram: LocalLookAdvisor.histogram(from: edited)
+                            full: edited,
+                            edited: cropped,
+                            histogram: LocalLookAdvisor.histogram(from: cropped)
                         )
                     }.value
                     guard !Task.isCancelled, self.previewGeneration == generation else { break }
+                    self.fullGradedPreview = rendered.full
                     self.editedPreview = rendered.edited
                     self.histogram = rendered.histogram
                 } catch {
@@ -192,8 +230,11 @@ final class EditorViewModel: ObservableObject {
         previewGeneration += 1
         sourcePreview = nil
         originalPreview = nil
+        fullGradedPreview = nil
         editedPreview = nil
         histogram = nil
+        crop = .identity
+        textOverlays = []
 
         let supportedExtensions = ["arw", "srf", "sr2", "dng", "jpg", "jpeg", "heic", "heif", "png"]
         guard supportedExtensions.contains(incomingURL.pathExtension.lowercased()) else {
@@ -250,6 +291,8 @@ final class EditorViewModel: ObservableObject {
         let settings = settings
         let intensity = intensity
         let options = exportOptions
+        let crop = crop
+        let textOverlays = textOverlays
         let format = options.format
         let stem = makeExportStem(for: photo, profile: profile)
         let outputURL = FileManager.default.temporaryDirectory
@@ -269,6 +312,8 @@ final class EditorViewModel: ObservableObject {
                         settings: settings,
                         intensity: intensity,
                         options: options,
+                        crop: crop,
+                        textOverlays: textOverlays,
                         to: outputURL
                     )
                 }.value

@@ -40,6 +40,12 @@ struct RawImageProcessor {
         let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
         let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] ?? [:]
         let gps = properties[kCGImagePropertyGPSDictionary] as? [CFString: Any]
+        let latitudeValue = (gps?[kCGImagePropertyGPSLatitude] as? NSNumber)?.doubleValue
+        let latitudeRef = gps?[kCGImagePropertyGPSLatitudeRef] as? String
+        let longitudeValue = (gps?[kCGImagePropertyGPSLongitude] as? NSNumber)?.doubleValue
+        let longitudeRef = gps?[kCGImagePropertyGPSLongitudeRef] as? String
+        let latitude = latitudeValue.map { latitudeRef == "S" ? -$0 : $0 }
+        let longitude = longitudeValue.map { longitudeRef == "W" ? -$0 : $0 }
 
         let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
         let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
@@ -72,6 +78,8 @@ struct RawImageProcessor {
             lensModel: exif[kCGImagePropertyExifLensModel] as? String ?? "",
             capturedAt: date,
             hasLocation: gps?.isEmpty == false,
+            latitude: latitude,
+            longitude: longitude,
             orientation: rawOrientation,
             isLikelyScreenshot: isLikelyScreenshot
         )
@@ -139,6 +147,8 @@ struct RawImageProcessor {
         settings: FilmSettings,
         intensity: Double,
         options: ExportOptions,
+        crop: CropTransform = .identity,
+        textOverlays: [PhotoTextOverlay] = [],
         to outputURL: URL
     ) throws -> ExportResult {
         return try autoreleasepool {
@@ -161,7 +171,7 @@ struct RawImageProcessor {
             )
 
             let displayP3 = CGColorSpace(name: CGColorSpace.displayP3)
-            guard let cgImage = context.createCGImage(
+            guard let gradedImage = context.createCGImage(
                 graded,
                 from: normalized.extent,
                 format: .RGBA8,
@@ -169,6 +179,8 @@ struct RawImageProcessor {
             ) else {
                 throw ImageProcessorError.cannotRender
             }
+            let croppedImage = CropProcessor.apply(crop, to: gradedImage)
+            let cgImage = TextOverlayRenderer.render(textOverlays, onto: croppedImage)
 
             var actualFormat = options.format
             var destination = CGImageDestinationCreateWithURL(

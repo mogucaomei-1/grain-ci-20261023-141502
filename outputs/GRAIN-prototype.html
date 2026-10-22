@@ -108,6 +108,7 @@
         <div class="top-actions">
           <button class="round" id="filesButton" title="从文件导入">⌑</button>
           <button class="round" id="histogramButton" title="显示或隐藏直方图" style="color:var(--accent)">▥</button>
+          <button class="round" id="infoButton" title="查看图片信息">ⓘ</button>
           <button class="round export" id="openExport">↗</button>
         </div>
         <input id="fileInput" type="file" accept=".arw,.ARW,.dng,.DNG,image/*">
@@ -152,6 +153,8 @@
             <button class="category active" data-category="light">光线</button>
             <button class="category" data-category="color">颜色</button>
             <button class="category" data-category="effects">效果</button>
+            <button class="category" id="cropButton" style="margin-left:auto;font-size:14px">⌗</button>
+            <button class="category" id="textButton" style="font-size:14px">T</button>
           </div>
           <div class="tool-row">
             <button class="tool show active" data-tool="exposure" data-cat="light">曝光</button>
@@ -280,6 +283,9 @@
     document.querySelectorAll('.format').forEach(b=>b.onclick=()=>{document.querySelectorAll('.format').forEach(x=>x.classList.toggle('active',x===b));const t=b.querySelector('strong').textContent;$('#formatFact').textContent=t;document.querySelector('.export-btn small').textContent=t});
     $('#filesButton').onclick=()=>$('#fileInput').click();
     $('#histogramButton').onclick=()=>{const h=document.querySelector('.histogram');const hidden=h.style.display==='none';h.style.display=hidden?'block':'none';$('#histogramButton').style.color=hidden?'var(--accent)':'var(--muted)'};
+    $('#infoButton').onclick=()=>alert('图片信息：2172 × 1448 · 3.1 MP · 2.4 MB · SONY ZV-E10');
+    $('#cropButton').onclick=()=>alert('完整裁剪与构图工具在 iOS App 中打开。');
+    $('#textButton').onclick=()=>alert('完整文字与 Emoji 工具在 iOS App 中打开。');
     $('#copyPreset').onclick=()=>$('#copyPreset').textContent='已复制';
     $('#pastePreset').onclick=()=>choose('portra');
     $('#fileInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const ext=f.name.split('.').pop().toUpperCase();if(ext==='ARW'){alert('浏览器原型不能解码 ARW；请使用 iOS 1.1 测试版。');return}const url=URL.createObjectURL(f);$('#editedPhoto').src=url;$('#originalPhoto').src=url;const i=new Image();i.onload=()=>{$('#dims').textContent=i.naturalWidth+' × '+i.naturalHeight};i.src=url};

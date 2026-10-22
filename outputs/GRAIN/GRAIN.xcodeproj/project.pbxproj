@@ -18,6 +18,9 @@
 		A10000000000000000000010 /* LookAdvisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* LookAdvisor.swift */; };
 		A10000000000000000000011 /* AnimatedCameraMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* AnimatedCameraMark.swift */; };
 		A10000000000000000000012 /* PhotoLibraryGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* PhotoLibraryGrid.swift */; };
+		A10000000000000000000013 /* CropProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* CropProcessor.swift */; };
+		A10000000000000000000014 /* CropEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* CropEditorView.swift */; };
+		A10000000000000000000015 /* EditingSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* EditingSheets.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +35,9 @@
 		B10000000000000000000010 /* LookAdvisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookAdvisor.swift; sourceTree = "<group>"; };
 		B10000000000000000000011 /* AnimatedCameraMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedCameraMark.swift; sourceTree = "<group>"; };
 		B10000000000000000000012 /* PhotoLibraryGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryGrid.swift; sourceTree = "<group>"; };
+		B10000000000000000000013 /* CropProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropProcessor.swift; sourceTree = "<group>"; };
+		B10000000000000000000014 /* CropEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropEditorView.swift; sourceTree = "<group>"; };
+		B10000000000000000000015 /* EditingSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditingSheets.swift; sourceTree = "<group>"; };
 		B1000000000000000000000A /* GRAIN.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GRAIN.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -67,6 +73,9 @@
 				B10000000000000000000010 /* LookAdvisor.swift */,
 				B10000000000000000000011 /* AnimatedCameraMark.swift */,
 				B10000000000000000000012 /* PhotoLibraryGrid.swift */,
+				B10000000000000000000013 /* CropProcessor.swift */,
+				B10000000000000000000014 /* CropEditorView.swift */,
+				B10000000000000000000015 /* EditingSheets.swift */,
 				B10000000000000000000009 /* Assets.xcassets */,
 			);
 			path = GRAIN;
@@ -159,6 +168,9 @@
 				A10000000000000000000010 /* LookAdvisor.swift in Sources */,
 				A10000000000000000000011 /* AnimatedCameraMark.swift in Sources */,
 				A10000000000000000000012 /* PhotoLibraryGrid.swift in Sources */,
+				A10000000000000000000013 /* CropProcessor.swift in Sources */,
+				A10000000000000000000014 /* CropEditorView.swift in Sources */,
+				A10000000000000000000015 /* EditingSheets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -276,7 +288,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -310,7 +322,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

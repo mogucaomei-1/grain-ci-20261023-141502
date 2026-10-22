@@ -238,6 +238,102 @@ struct PresetClipboard: Codable, Sendable {
     }
 }
 
+enum CropAspect: String, CaseIterable, Identifiable, Codable, Sendable {
+    case original
+    case free
+    case square
+    case portrait4x5
+    case landscape5x4
+    case portrait3x4
+    case landscape4x3
+    case portrait2x3
+    case landscape3x2
+    case portrait9x16
+    case landscape16x9
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .original: "原始"
+        case .free: "自由"
+        case .square: "1:1"
+        case .portrait4x5: "4:5"
+        case .landscape5x4: "5:4"
+        case .portrait3x4: "3:4"
+        case .landscape4x3: "4:3"
+        case .portrait2x3: "2:3"
+        case .landscape3x2: "3:2"
+        case .portrait9x16: "9:16"
+        case .landscape16x9: "16:9"
+        }
+    }
+
+    var ratio: Double? {
+        switch self {
+        case .original, .free: nil
+        case .square: 1
+        case .portrait4x5: 4.0 / 5
+        case .landscape5x4: 5.0 / 4
+        case .portrait3x4: 3.0 / 4
+        case .landscape4x3: 4.0 / 3
+        case .portrait2x3: 2.0 / 3
+        case .landscape3x2: 3.0 / 2
+        case .portrait9x16: 9.0 / 16
+        case .landscape16x9: 16.0 / 9
+        }
+    }
+}
+
+struct CropTransform: Codable, Equatable, Sendable {
+    var aspect: CropAspect = .original
+    var normalizedX = 0.0
+    var normalizedY = 0.0
+    var normalizedWidth = 1.0
+    var normalizedHeight = 1.0
+    var rotationQuarterTurns = 0
+    var flipHorizontal = false
+    var flipVertical = false
+
+    static let identity = CropTransform()
+
+    var isIdentity: Bool {
+        normalizedX == 0 && normalizedY == 0
+            && normalizedWidth == 1 && normalizedHeight == 1
+            && rotationQuarterTurns == 0
+            && !flipHorizontal && !flipVertical
+    }
+}
+
+enum PhotoTextFont: String, CaseIterable, Identifiable, Codable, Sendable {
+    case rounded
+    case serif
+    case monospaced
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .rounded: "现代"
+        case .serif: "衬线"
+        case .monospaced: "等宽"
+        }
+    }
+}
+
+struct PhotoTextOverlay: Identifiable, Equatable, Codable, Sendable {
+    var id = UUID()
+    var text = "输入文字"
+    var x = 0.5
+    var y = 0.5
+    var fontSize = 0.07
+    var font: PhotoTextFont = .rounded
+    var red = 1.0
+    var green = 1.0
+    var blue = 1.0
+    var alpha = 1.0
+}
+
 enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
     case heic
     case jpeg
@@ -292,6 +388,8 @@ struct PhotoAsset: Identifiable, Equatable, Sendable {
     let lensModel: String
     let capturedAt: Date?
     let hasLocation: Bool
+    let latitude: Double?
+    let longitude: Double?
     let orientation: UInt32
     let isLikelyScreenshot: Bool
 

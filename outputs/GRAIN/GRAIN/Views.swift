@@ -7,6 +7,7 @@ struct RootView: View {
     @AppStorage("showHistogram") private var showHistogram = true
     @State private var showDocumentPicker = false
     @State private var showExportSheet = false
+    @State private var showInfoSheet = false
 
     var body: some View {
         ZStack {
@@ -17,6 +18,7 @@ struct RootView: View {
                     hasPhoto: editor.photo != nil,
                     onBack: editor.returnHome,
                     onFiles: { showDocumentPicker = true },
+                    onInfo: { showInfoSheet = true },
                     histogramVisible: showHistogram,
                     onToggleHistogram: {
                         withAnimation(.easeOut(duration: 0.18)) {
@@ -51,6 +53,12 @@ struct RootView: View {
             ExportSettingsSheet()
                 .environmentObject(editor)
                 .presentationDetents([.height(470)])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showInfoSheet) {
+            ImageInfoSheet()
+                .environmentObject(editor)
+                .presentationDetents([.height(520)])
                 .presentationDragIndicator(.visible)
         }
         .alert(
@@ -98,6 +106,7 @@ private struct MinimalTopBar: View {
     let hasPhoto: Bool
     let onBack: () -> Void
     let onFiles: () -> Void
+    let onInfo: () -> Void
     let histogramVisible: Bool
     let onToggleHistogram: () -> Void
     let onExport: () -> Void
@@ -144,6 +153,17 @@ private struct MinimalTopBar: View {
             .buttonStyle(.plain)
             .accessibilityLabel(histogramVisible ? "隐藏直方图" : "显示直方图")
 
+            Button(action: onInfo) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(hasPhoto ? GrainTheme.paper : GrainTheme.muted)
+                    .frame(width: 38, height: 38)
+                    .background(GrainTheme.raised, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasPhoto)
+            .accessibilityLabel("查看图片信息")
+
             Button(action: onExport) {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 14, weight: .bold))
@@ -161,18 +181,43 @@ private struct MinimalTopBar: View {
 }
 
 private struct EditorWorkspace: View {
+    @EnvironmentObject private var editor: EditorViewModel
     let showHistogram: Bool
+    @State private var showCropEditor = false
+    @State private var editingTextID: UUID?
+    @State private var showTextEditor = false
 
     var body: some View {
         VStack(spacing: 0) {
-            PhotoEditorCanvas(showHistogram: showHistogram)
+            PhotoEditorCanvas(showHistogram: showHistogram) { id in
+                editingTextID = id
+                showTextEditor = true
+            }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             FilmPresetBar()
                 .frame(height: 100)
 
-            AdjustPanel()
+            AdjustPanel(
+                onCrop: { showCropEditor = true },
+                onAddText: {
+                    editingTextID = editor.addTextOverlay()
+                    showTextEditor = true
+                }
+            )
                 .frame(height: 146)
+        }
+        .fullScreenCover(isPresented: $showCropEditor) {
+            CropEditorView()
+                .environmentObject(editor)
+        }
+        .sheet(isPresented: $showTextEditor, onDismiss: { editingTextID = nil }) {
+            if let editingTextID {
+                TextOverlayEditorView(overlayID: editingTextID)
+                    .environmentObject(editor)
+                    .presentationDetents([.height(455)])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 }
@@ -180,6 +225,7 @@ private struct EditorWorkspace: View {
 private struct PhotoEditorCanvas: View {
     @EnvironmentObject private var editor: EditorViewModel
     let showHistogram: Bool
+    let onEditText: (UUID) -> Void
     @State private var showOriginal = false
     @State private var showFullscreen = false
 
@@ -204,6 +250,39 @@ private struct PhotoEditorCanvas: View {
                     } else {
                         ProgressView()
                             .tint(GrainTheme.paper)
+                    }
+
+                    ForEach(editor.textOverlays) { overlay in
+                        let fontSize = max(10, min(proxy.size.width, imageHeight) * overlay.fontSize)
+                        Text(overlay.text.isEmpty ? " " : overlay.text)
+                            .font(overlay.font.swiftUIFont(size: fontSize))
+                            .foregroundStyle(
+                                Color(
+                                    red: overlay.red,
+                                    green: overlay.green,
+                                    blue: overlay.blue,
+                                    opacity: overlay.alpha
+                                )
+                            )
+                            .multilineTextAlignment(.center)
+                            .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
+                            .position(
+                                x: overlay.x * proxy.size.width,
+                                y: overlay.y * imageHeight
+                            )
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        editor.moveTextOverlay(
+                                            id: overlay.id,
+                                            x: value.location.x / max(proxy.size.width, 1),
+                                            y: value.location.y / max(imageHeight, 1)
+                                        )
+                                    }
+                            )
+                            .onTapGesture {
+                                onEditText(overlay.id)
+                            }
                     }
 
                     VStack {
@@ -363,16 +442,45 @@ private struct FullscreenPhotoView: View {
             Color.black.ignoresSafeArea()
 
             if let image = editor.editedPreview {
-                Image(decorative: image, scale: 1)
-                    .resizable()
-                    .scaledToFit()
+                GeometryReader { proxy in
+                    let rect = fittedRect(for: image, in: proxy.size)
+                    ZStack {
+                        Image(decorative: image, scale: 1)
+                            .resizable()
+                            .frame(width: rect.width, height: rect.height)
+
+                        ForEach(editor.textOverlays) { overlay in
+                            Text(overlay.text)
+                                .font(
+                                    overlay.font.swiftUIFont(
+                                        size: max(10, min(rect.width, rect.height) * overlay.fontSize)
+                                    )
+                                )
+                                .foregroundStyle(
+                                    Color(
+                                        red: overlay.red,
+                                        green: overlay.green,
+                                        blue: overlay.blue,
+                                        opacity: overlay.alpha
+                                    )
+                                )
+                                .multilineTextAlignment(.center)
+                                .position(
+                                    x: overlay.x * rect.width,
+                                    y: overlay.y * rect.height
+                                )
+                        }
+                    }
+                    .frame(width: rect.width, height: rect.height)
                     .scaleEffect(scale)
                     .offset(offset)
+                    .position(x: rect.midX, y: rect.midY)
                     .gesture(magnificationGesture)
                     .simultaneousGesture(dragGesture)
                     .onTapGesture(count: 2, perform: toggleZoom)
                     .animation(.easeOut(duration: 0.16), value: scale)
                     .animation(.easeOut(duration: 0.16), value: offset)
+                }
             } else {
                 ProgressView()
                     .tint(GrainTheme.paper)
@@ -484,6 +592,23 @@ private struct FullscreenPhotoView: View {
             offset = .zero
             lastOffset = .zero
         }
+    }
+
+    private func fittedRect(for image: CGImage, in size: CGSize) -> CGRect {
+        let imageRatio = CGFloat(image.width) / CGFloat(image.height)
+        let sizeRatio = size.width / max(size.height, 1)
+        let fitted: CGSize
+        if imageRatio > sizeRatio {
+            fitted = CGSize(width: size.width, height: size.width / imageRatio)
+        } else {
+            fitted = CGSize(width: size.height * imageRatio, height: size.height)
+        }
+        return CGRect(
+            x: (size.width - fitted.width) / 2,
+            y: (size.height - fitted.height) / 2,
+            width: fitted.width,
+            height: fitted.height
+        )
     }
 }
 
@@ -655,6 +780,8 @@ private enum AdjustTool: String, CaseIterable, Identifiable {
 
 private struct AdjustPanel: View {
     @EnvironmentObject private var editor: EditorViewModel
+    let onCrop: () -> Void
+    let onAddText: () -> Void
     @State private var selectedCategory: AdjustCategory = .light
     @State private var selectedTool: AdjustTool = .exposure
 
@@ -682,6 +809,26 @@ private struct AdjustPanel: View {
                     .buttonStyle(.plain)
                 }
                 Spacer()
+
+                Button(action: onCrop) {
+                    Image(systemName: "crop.rotate")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(GrainTheme.paper)
+                        .frame(width: 30, height: 27)
+                        .background(GrainTheme.raised, in: RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("裁剪与构图")
+
+                Button(action: onAddText) {
+                    Image(systemName: "textformat")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(GrainTheme.paper)
+                        .frame(width: 30, height: 27)
+                        .background(GrainTheme.raised, in: RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("添加文字")
             }
             .padding(.horizontal, 2)
 
