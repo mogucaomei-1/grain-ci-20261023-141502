@@ -303,7 +303,14 @@ struct RawImageProcessor {
             kCIInputAmountKey: settings.vibrance / 100 * amount
         ])
 
-        if profile == .classicChrome {
+        if profile == .film135t {
+            graded = graded.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.01, y: 0.02, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.00, y: 0.98, z: 0.03, w: 0),
+                "inputBVector": CIVector(x: 0.00, y: 0.04, z: 1.04, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        } else if profile == .classicChrome {
             graded = graded.applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: 0.96, y: 0.02, z: 0.02, w: 0),
                 "inputGVector": CIVector(x: 0.01, y: 0.98, z: 0.04, w: 0),
@@ -317,9 +324,37 @@ struct RawImageProcessor {
                 "inputBVector": CIVector(x: 0, y: 0.01, z: 1.01, w: 0),
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
             ])
+        } else if profile == .velvia50 {
+            graded = graded.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.06, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.04, z: 0.01, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.02, z: 0.98, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        } else if profile == .ektar100 {
+            graded = graded.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.05, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 0.99, z: 0.01, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.03, z: 1.02, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        } else if profile == .superia400 {
+            graded = graded.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.98, y: 0.01, z: 0.01, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.04, z: 0.02, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.04, z: 0.99, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        } else if profile == .vision250d {
+            graded = graded.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.02, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.0, z: 0.02, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.03, z: 0.97, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
         }
 
-        if profile == .hp5 {
+        if profile.isMonochrome {
             graded = graded.applyingFilter("CIPhotoEffectMono")
                 .applyingFilter("CIColorMatrix", parameters: [
                     "inputRVector": CIVector(x: 1.02, y: 0.99, z: 0.93, w: 0),

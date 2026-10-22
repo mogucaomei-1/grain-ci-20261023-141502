@@ -2,7 +2,7 @@
 
 - `GRAIN-1.1-build3-unsigned.ipa`：1.1 (3)、arm64、未签名的可重签 IPA。
 - `GRAIN-1.1-build3-unsigned.sha256`：对应 IPA 的校验值。
-- `GRAIN-prototype.html`：可直接在浏览器打开的交互原型，支持拖动对比、胶片配方、参数滑杆、导出面板和定位开关。
+- `GRAIN-prototype.html`：可直接在浏览器打开的交互原型，支持实时胶片预览、分组参数、导出面板和定位开关。
 - `GRAIN/`：可导入 Xcode 的 iPhone SwiftUI 工程源码。
 - `GRAIN-demo.jpg`：网页预览使用用户提供的 Sony ZV-E10 JPEG 样片。
 - `GRAIN-preview.png`：1.1 单页编辑器预览。

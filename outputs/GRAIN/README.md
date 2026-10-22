@@ -19,14 +19,14 @@ GRAIN 是一个面向 iPhone 的 SwiftUI RAW 调色 App MVP。主流程围绕 So
 - 默认 HEIC，质量 100%；可切换 JPEG，质量 100%；HEIC 不可用时自动回退 JPEG。
 - 输出 Display P3，保留相机、镜头、拍摄时间等 EXIF/TIFF 字段。
 - “保留地址信息”开关控制 GPS 字典及 IPTC 位置字段，关闭后不会写入导出文件。
-- 七套非破坏性色彩配方：RAW Neutral、Portra 400、Pro 400H、Gold 200、Classic Chrome、CineStill 800T、HP5 Plus。
+- 十七套中文命名的非破坏性胶片配方，覆盖彩色负片、反转片、电影胶片与黑白银盐，其中包含原创参数实现的“135T 街拍”。
 - 可调曝光、对比、高光、阴影、白色、黑色、色温、色调、自然饱和度、饱和度、清晰度、锐化、褪色、颗粒、暗角和配方强度。
 - 单页实时预览、长按查看原片、返回主页、相机与原始像素信息、导出结果分享。
 
 ## 关键文件
 
 - `GRAIN/ImageProcessor.swift`：RAW 解码、预览、色彩管线、全尺寸导出和元数据策略。
-- `GRAIN/Models.swift`：照片模型、七套胶片配方与导出参数。
+- `GRAIN/Models.swift`：照片模型、十七套胶片配方与导出参数。
 - `GRAIN/EditorViewModel.swift`：导入、后台预览、取消旧任务和导出状态。
 - `GRAIN/Views.swift`：无滚动单页编辑器、实时胶片横栏和紧凑导出面板。
 - `GRAIN/PhotosImporter.swift`：保留原始文件表示方式的照片图库导入器。

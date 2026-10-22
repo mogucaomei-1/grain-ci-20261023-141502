@@ -113,20 +113,30 @@
             <img id="editedPhoto" src="GRAIN-demo.jpg" alt="Sony ZV-E10 照片">
             <img id="originalPhoto" class="original" src="GRAIN-demo.jpg" alt="原始照片">
             <div class="photo-top"><span class="pill">RAW · ZV-E10</span><span class="spinner"></span></div>
-            <div class="photo-bottom"><span class="pill" id="profilePill">Portra 400</span><span class="pill" id="holdOriginal">按住看原片</span></div>
+            <div class="photo-bottom"><span class="pill" id="profilePill">柯达 波特拉 400</span><span class="pill" id="holdOriginal">按住看原片</span></div>
           </div>
         </section>
 
         <section class="filmbar">
-          <div class="section-head"><b>FILM</b><span id="filmName">Portra 400</span><button id="reset">↺</button></div>
+          <div class="section-head"><b>胶片</b><span id="filmName">柯达 波特拉 400</span><button id="reset">↺</button></div>
           <div class="films" id="films">
-            <button class="film" data-profile="neutral"><span class="swatch" style="background:linear-gradient(135deg,#8b8d8a,#b7b3a9,#dfd8cb)">NEUTRAL</span><span class="name">RAW Neutral</span></button>
-            <button class="film active" data-profile="portra"><span class="swatch" style="background:linear-gradient(135deg,#b86f58,#d6aa86,#eadcc7)">PORTRA</span><span class="name">Portra 400</span></button>
-            <button class="film" data-profile="pro400h"><span class="swatch" style="background:linear-gradient(135deg,#5f7f79,#aabdb0,#dddcc7)">400H</span><span class="name">Pro 400H</span></button>
-            <button class="film" data-profile="gold"><span class="swatch" style="background:linear-gradient(135deg,#a84a31,#d79d54,#e9d3a2)">GOLD</span><span class="name">Gold 200</span></button>
-            <button class="film" data-profile="chrome"><span class="swatch" style="background:linear-gradient(135deg,#344a49,#7f8b82,#b9b5a7)">CHROME</span><span class="name">Classic Chrome</span></button>
-            <button class="film" data-profile="cinestill"><span class="swatch" style="background:linear-gradient(135deg,#2d5568,#b44e42,#d8b4a1)">800T</span><span class="name">CineStill 800T</span></button>
-            <button class="film" data-profile="hp5"><span class="swatch" style="background:linear-gradient(135deg,#2a2a28,#84817a,#d6d0c4)">HP5</span><span class="name">HP5 Plus</span></button>
+            <button class="film" data-profile="neutral"><span class="swatch" style="background:linear-gradient(135deg,#8b8d8a,#b7b3a9,#dfd8cb)">原片</span><span class="name">原片中性</span></button>
+            <button class="film active" data-profile="portra"><span class="swatch" style="background:linear-gradient(135deg,#b86f58,#d6aa86,#eadcc7)">波特拉</span><span class="name">柯达 波特拉 400</span></button>
+            <button class="film" data-profile="film135t"><span class="swatch" style="background:linear-gradient(135deg,#254b66,#4f8a86,#d8c0a2)">135T</span><span class="name">135T 街拍</span></button>
+            <button class="film" data-profile="portra160"><span class="swatch" style="background:linear-gradient(135deg,#b77a66,#d9b08f,#eee0cc)">P160</span><span class="name">柯达 波特拉 160</span></button>
+            <button class="film" data-profile="portra800"><span class="swatch" style="background:linear-gradient(135deg,#aa614d,#d1a27c,#e8c8a9)">P800</span><span class="name">柯达 波特拉 800</span></button>
+            <button class="film" data-profile="pro400h"><span class="swatch" style="background:linear-gradient(135deg,#5f7f79,#aabdb0,#dddcc7)">400H</span><span class="name">富士 专业 400H</span></button>
+            <button class="film" data-profile="gold"><span class="swatch" style="background:linear-gradient(135deg,#a84a31,#d79d54,#e9d3a2)">金200</span><span class="name">柯达 金 200</span></button>
+            <button class="film" data-profile="ektar100"><span class="swatch" style="background:linear-gradient(135deg,#8f3e34,#c47d56,#86a9a2)">艾克塔</span><span class="name">柯达 艾克塔 100</span></button>
+            <button class="film" data-profile="chrome"><span class="swatch" style="background:linear-gradient(135deg,#344a49,#7f8b82,#b9b5a7)">经典</span><span class="name">富士 经典正片</span></button>
+            <button class="film" data-profile="velvia50"><span class="swatch" style="background:linear-gradient(135deg,#1f6654,#c95346,#e5b95e)">维尔维亚</span><span class="name">富士 维尔维亚 50</span></button>
+            <button class="film" data-profile="provia100f"><span class="swatch" style="background:linear-gradient(135deg,#315e63,#91a79a,#d4b78c)">普罗维亚</span><span class="name">富士 普罗维亚 100F</span></button>
+            <button class="film" data-profile="superia400"><span class="swatch" style="background:linear-gradient(135deg,#3d765d,#8db78a,#d4c8a6)">超级</span><span class="name">富士 超级 400</span></button>
+            <button class="film" data-profile="cinestill"><span class="swatch" style="background:linear-gradient(135deg,#2d5568,#b44e42,#d8b4a1)">夜光</span><span class="name">电影 夜光 800T</span></button>
+            <button class="film" data-profile="vision250d"><span class="swatch" style="background:linear-gradient(135deg,#536f6b,#be8b62,#d7c3a1)">250D</span><span class="name">电影 Vision3 250D</span></button>
+            <button class="film" data-profile="hp5"><span class="swatch" style="background:linear-gradient(135deg,#2a2a28,#84817a,#d6d0c4)">HP5</span><span class="name">伊尔福 HP5 Plus</span></button>
+            <button class="film" data-profile="trix"><span class="swatch" style="background:linear-gradient(135deg,#20201f,#6d6b66,#c5c0b6)">Tri-X</span><span class="name">柯达 Tri-X 400</span></button>
+            <button class="film" data-profile="delta3200"><span class="swatch" style="background:linear-gradient(135deg,#292a29,#777a78,#cfcfc9)">Delta</span><span class="name">伊尔福 Delta 3200</span></button>
           </div>
         </section>
 
@@ -163,7 +173,7 @@
     <section class="sheet" id="exportSheet">
       <div class="grab"></div>
       <div class="sheet-title"><div><h2>导出</h2><p>原始尺寸 · 最高质量</p></div><button class="close" id="closeExport">✕</button></div>
-      <div class="facts"><div class="fact"><strong id="dims">2172 × 1448</strong><span>输出像素</span></div><div class="sep"></div><div class="fact"><strong id="exportFilm">PORTRA</strong><span>胶片</span></div><div class="sep"></div><div class="fact"><strong id="formatFact">HEIC</strong><span>格式</span></div></div>
+      <div class="facts"><div class="fact"><strong id="dims">2172 × 1448</strong><span>输出像素</span></div><div class="sep"></div><div class="fact"><strong id="exportFilm">波特拉</strong><span>胶片</span></div><div class="sep"></div><div class="fact"><strong id="formatFact">HEIC</strong><span>格式</span></div></div>
       <div class="formats"><button class="format active" data-format="heic"><strong>HEIC</strong><span>高画质 · 更小体积</span></button><button class="format" data-format="jpeg"><strong>JPEG</strong><span>兼容性最佳</span></button></div>
       <div class="toggle-row"><div><strong>保留相机信息</strong><small>机身、镜头、快门与拍摄时间</small></div><label class="switch"><input type="checkbox" checked><i></i></label></div>
       <div class="toggle-row"><div><strong>保留地址信息</strong><small>GPS 将写入导出文件</small></div><label class="switch"><input type="checkbox" checked><i></i></label></div>
@@ -174,13 +184,23 @@
 
   <script>
     const profiles={
-      neutral:{name:'RAW Neutral',badge:'NEUTRAL',filter:'none',range:[0,100],value:100},
-      portra:{name:'Portra 400',badge:'PORTRA',filter:'saturate(.88) contrast(.94) sepia(.08) brightness(1.035)',range:[0,100],value:82},
-      pro400h:{name:'Pro 400H',badge:'400H',filter:'saturate(.78) contrast(.91) sepia(.025) brightness(1.055)',range:[0,100],value:82},
-      gold:{name:'Gold 200',badge:'GOLD',filter:'saturate(1.14) contrast(1.06) sepia(.16) brightness(1.01)',range:[0,100],value:82},
-      chrome:{name:'Classic Chrome',badge:'CHROME',filter:'saturate(.61) contrast(1.14) sepia(.02) brightness(.99)',range:[0,100],value:82},
-      cinestill:{name:'CineStill 800T',badge:'800T',filter:'saturate(.96) contrast(.97) hue-rotate(6deg) brightness(1.02)',range:[0,100],value:82},
-      hp5:{name:'HP5 Plus',badge:'HP5',filter:'grayscale(1) contrast(1.17) brightness(.98)',range:[0,100],value:82}
+      neutral:{name:'原片中性',badge:'原片',filter:'none'},
+      portra:{name:'柯达 波特拉 400',badge:'波特拉',filter:'saturate(.88) contrast(.94) sepia(.08) brightness(1.035)'},
+      film135t:{name:'135T 街拍',badge:'135T',filter:'saturate(.93) contrast(1.15) brightness(.99) hue-rotate(-3deg)'},
+      portra160:{name:'柯达 波特拉 160',badge:'P160',filter:'saturate(.94) contrast(.92) sepia(.06) brightness(1.04)'},
+      portra800:{name:'柯达 波特拉 800',badge:'P800',filter:'saturate(.92) contrast(.91) sepia(.10) brightness(1.045)'},
+      pro400h:{name:'富士 专业 400H',badge:'400H',filter:'saturate(.78) contrast(.91) sepia(.025) brightness(1.055)'},
+      gold:{name:'柯达 金 200',badge:'金200',filter:'saturate(1.14) contrast(1.06) sepia(.16) brightness(1.01)'},
+      ektar100:{name:'柯达 艾克塔 100',badge:'艾克塔',filter:'saturate(1.18) contrast(1.10) brightness(1.01)'},
+      chrome:{name:'富士 经典正片',badge:'经典',filter:'saturate(.61) contrast(1.14) sepia(.02) brightness(.99)'},
+      velvia50:{name:'富士 维尔维亚 50',badge:'维尔维亚',filter:'saturate(1.3) contrast(1.13) brightness(.99)'},
+      provia100f:{name:'富士 普罗维亚 100F',badge:'普罗维亚',filter:'saturate(1.13) contrast(1.08) brightness(1.01)'},
+      superia400:{name:'富士 超级 400',badge:'超级',filter:'saturate(1.08) contrast(1.03) hue-rotate(-3deg) brightness(1.03)'},
+      cinestill:{name:'电影 夜光 800T',badge:'夜光',filter:'saturate(.96) contrast(.97) hue-rotate(6deg) brightness(1.02)'},
+      vision250d:{name:'电影 Vision3 250D',badge:'250D',filter:'saturate(.95) contrast(.97) sepia(.07) brightness(1.03)'},
+      hp5:{name:'伊尔福 HP5 Plus',badge:'HP5',filter:'grayscale(1) contrast(1.17) brightness(.98)'},
+      trix:{name:'柯达 Tri-X 400',badge:'Tri-X',filter:'grayscale(1) contrast(1.24) brightness(.98)'},
+      delta3200:{name:'伊尔福 Delta 3200',badge:'Delta',filter:'grayscale(1) contrast(1.08) brightness(1.04)'}
     };
     let activeProfile='portra',activeTool='exposure',activeCategory='light';
     const sliders={
