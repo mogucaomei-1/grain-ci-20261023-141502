@@ -252,6 +252,7 @@ private struct EditorWorkspace: View {
 private struct PhotoEditorCanvas: View {
     @EnvironmentObject private var editor: EditorViewModel
     @State private var showOriginal = false
+    @State private var showFullscreen = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -310,7 +311,7 @@ private struct PhotoEditorCanvas: View {
 
                             Spacer()
 
-                            Text("按住看原片")
+                            Text("轻点全屏 · 按住看原片")
                                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                                 .foregroundStyle(GrainTheme.paper)
                                 .padding(.horizontal, 11)
@@ -333,6 +334,10 @@ private struct PhotoEditorCanvas: View {
                         }
                     }
                     .padding(13)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showFullscreen = true
+                    }
                 }
                 .frame(width: proxy.size.width, height: imageHeight)
             }
@@ -340,6 +345,10 @@ private struct PhotoEditorCanvas: View {
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+        .fullScreenCover(isPresented: $showFullscreen) {
+            FullscreenPhotoView()
+                .environmentObject(editor)
+        }
     }
 
     private var imageAspect: CGFloat {
@@ -347,6 +356,120 @@ private struct PhotoEditorCanvas: View {
             return 3 / 2
         }
         return CGFloat(photo.pixelWidth) / CGFloat(photo.pixelHeight)
+    }
+}
+
+private struct FullscreenPhotoView: View {
+    @EnvironmentObject private var editor: EditorViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+    @State private var lastScale: CGFloat = 1
+    @State private var offset = CGSize.zero
+    @State private var lastOffset = CGSize.zero
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            if let image = editor.editedPreview {
+                Image(decorative: image, scale: 1)
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(magnificationGesture)
+                    .simultaneousGesture(dragGesture)
+                    .onTapGesture(count: 2, perform: toggleZoom)
+                    .animation(.easeOut(duration: 0.16), value: scale)
+                    .animation(.easeOut(duration: 0.16), value: offset)
+            } else {
+                ProgressView()
+                    .tint(GrainTheme.paper)
+            }
+
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(GrainTheme.paper)
+                            .frame(width: 40, height: 40)
+                            .background(Color.black.opacity(0.58), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Text(editor.selectedProfile.name)
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(GrainTheme.paper)
+                        .padding(.horizontal, 11)
+                        .frame(height: 29)
+                        .background(Color.black.opacity(0.58), in: Capsule())
+                }
+                .padding(.horizontal, 16)
+
+                Spacer()
+
+                Text("双指缩放 · 拖动查看 · 双击复位")
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundStyle(GrainTheme.paper.opacity(0.72))
+                    .padding(.horizontal, 12)
+                    .frame(height: 28)
+                    .background(Color.black.opacity(0.56), in: Capsule())
+                    .padding(.bottom, 18)
+            }
+        }
+        .statusBarHidden()
+    }
+
+    private var magnificationGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                scale = min(max(lastScale * value, 1), 6)
+            }
+            .onEnded { _ in
+                lastScale = scale
+                if scale <= 1.01 {
+                    resetTransform()
+                }
+            }
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                guard scale > 1.01 else { return }
+                offset = CGSize(
+                    width: lastOffset.width + value.translation.width,
+                    height: lastOffset.height + value.translation.height
+                )
+            }
+            .onEnded { _ in
+                lastOffset = offset
+            }
+    }
+
+    private func toggleZoom() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            if scale > 1.05 {
+                resetTransform()
+            } else {
+                scale = 2.5
+                lastScale = 2.5
+            }
+        }
+    }
+
+    private func resetTransform() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+            scale = 1
+            lastScale = 1
+            offset = .zero
+            lastOffset = .zero
+        }
     }
 }
 
