@@ -37,6 +37,27 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build | tee ci/unsigned-build.log
 
+      - name: Download Sony ARW regression sample
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 \
+            "https://www.rawsamples.ch/raws/sony/RAW_SONY_ILCE-7RM2.ARW" \
+            --output ci/raw-smoke-test/sony-sample.arw
+
+      - name: Test real Sony ARW decode and full-size export
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc \
+            outputs/GRAIN/GRAIN/Models.swift \
+            outputs/GRAIN/GRAIN/ImageProcessor.swift \
+            ci/raw-smoke-test/main.swift \
+            -o ci/raw-smoke-test/raw-smoke-test
+          ci/raw-smoke-test/raw-smoke-test \
+            ci/raw-smoke-test/sony-sample.arw \
+            ci/raw-smoke-test/sony-export.jpg
+
       - name: Upload compiler log
         if: always()
         uses: actions/upload-artifact@v4
