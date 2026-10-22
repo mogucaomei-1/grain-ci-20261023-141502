@@ -38,6 +38,8 @@
     .photo.holding img.original{opacity:1}
     .photo-top,.photo-bottom{position:absolute;left:13px;right:13px;z-index:2;display:flex;justify-content:space-between;align-items:center}
     .photo-top{top:13px}.photo-bottom{bottom:13px}
+    .histogram{position:absolute;z-index:3;right:13px;top:45px;width:82px;height:46px;border-radius:9px;background:rgba(0,0,0,.52);border:1px solid rgba(255,255,255,.15);padding:4px;backdrop-filter:blur(8px)}
+    .histogram svg{width:100%;height:100%}
     .pill{height:27px;border-radius:999px;background:rgba(0,0,0,.52);padding:0 10px;display:flex;align-items:center;font-size:8px;font-weight:700;letter-spacing:.5px;backdrop-filter:blur(8px)}
     .pill.active{color:var(--paper)}
     .spinner{width:13px;height:13px;border:1.5px solid rgba(255,255,255,.25);border-top-color:var(--paper);border-radius:50%;animation:spin .8s linear infinite;opacity:0}
@@ -117,6 +119,7 @@
             <img id="editedPhoto" src="GRAIN-demo.jpg" alt="Sony ZV-E10 照片">
             <img id="originalPhoto" class="original" src="GRAIN-demo.jpg" alt="原始照片">
             <div class="photo-top"><span class="pill">RAW · ZV-E10</span><span class="spinner"></span></div>
+            <div class="histogram" aria-label="图像直方图"><svg viewBox="0 0 76 38" preserveAspectRatio="none"><path d="M1 37 L6 36 10 31 14 20 19 15 24 19 29 27 34 31 39 18 44 7 49 12 54 26 59 31 64 28 70 34 75 37Z" fill="rgba(255,255,255,.2)"/><path d="M1 36 10 31 18 17 25 22 34 29 43 8 51 20 60 31 69 28 75 36" fill="none" stroke="rgba(255,88,73,.8)" stroke-width="1"/><path d="M1 35 9 28 17 23 25 17 33 25 41 14 50 24 58 29 66 25 75 35" fill="none" stroke="rgba(104,226,160,.7)" stroke-width="1"/><path d="M1 37 10 33 17 24 25 20 33 11 41 17 49 29 57 30 66 27 75 37" fill="none" stroke="rgba(84,205,255,.78)" stroke-width="1"/></svg></div>
             <div class="photo-bottom"><span class="pill" id="profilePill">柯达 波特拉 400</span><span class="pill" id="holdOriginal">按住看原片</span></div>
           </div>
         </section>

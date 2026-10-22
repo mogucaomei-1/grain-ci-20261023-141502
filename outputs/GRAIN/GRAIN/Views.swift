@@ -73,6 +73,8 @@ struct RootView: View {
                 Text(notice)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(GrainTheme.black)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                     .padding(.horizontal, 13)
                     .frame(height: 30)
                     .background(GrainTheme.paper, in: Capsule())
@@ -224,6 +226,11 @@ private struct PhotoEditorCanvas: View {
 
                             Spacer()
 
+                            if let histogram = editor.histogram {
+                                HistogramView(data: histogram)
+                                    .frame(width: 82, height: 46)
+                            }
+
                             if editor.isPreparing {
                                 ProgressView()
                                     .controlSize(.small)
@@ -290,6 +297,62 @@ private struct PhotoEditorCanvas: View {
             return 3 / 2
         }
         return CGFloat(photo.pixelWidth) / CGFloat(photo.pixelHeight)
+    }
+}
+
+private struct HistogramView: View {
+    let data: RGBHistogram
+
+    var body: some View {
+        Canvas { context, size in
+            let inset: CGFloat = 4
+            let width = max(size.width - inset * 2, 1)
+            let height = max(size.height - inset * 2, 1)
+
+            var fill = Path()
+            fill.move(to: CGPoint(x: inset, y: inset + height))
+            for (index, value) in data.luminance.enumerated() {
+                let x = inset + CGFloat(index) / CGFloat(max(data.luminance.count - 1, 1)) * width
+                let y = inset + height - CGFloat(value) * height
+                fill.addLine(to: CGPoint(x: x, y: y))
+            }
+            fill.addLine(to: CGPoint(x: inset + width, y: inset + height))
+            fill.closeSubpath()
+            context.fill(fill, with: .color(Color.white.opacity(0.20)))
+
+            draw(channel: data.red, color: Color.red.opacity(0.72), in: context, size: size, inset: inset)
+            draw(channel: data.green, color: Color.green.opacity(0.62), in: context, size: size, inset: inset)
+            draw(channel: data.blue, color: Color.cyan.opacity(0.72), in: context, size: size, inset: inset)
+        }
+        .padding(4)
+        .background(Color.black.opacity(0.52), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(Color.white.opacity(0.15), lineWidth: 0.7)
+        }
+        .accessibilityLabel("图像直方图")
+    }
+
+    private func draw(
+        channel: [Double],
+        color: Color,
+        in context: GraphicsContext,
+        size: CGSize,
+        inset: CGFloat
+    ) {
+        let width = max(size.width - inset * 2, 1)
+        let height = max(size.height - inset * 2, 1)
+        var path = Path()
+        for (index, value) in channel.enumerated() {
+            let x = inset + CGFloat(index) / CGFloat(max(channel.count - 1, 1)) * width
+            let y = inset + height - CGFloat(value) * height
+            if index == 0 {
+                path.move(to: CGPoint(x: x, y: y))
+            } else {
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        context.stroke(path, with: .color(color), lineWidth: 0.8)
     }
 }
 
@@ -420,6 +483,8 @@ private struct FilmPresetBar: View {
                 Text(editor.selectedProfile.name)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(GrainTheme.paper)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Spacer()
 
                 Button {

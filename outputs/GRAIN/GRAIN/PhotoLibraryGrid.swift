@@ -106,19 +106,14 @@ struct PhotoLibraryHome: View {
     let onSelect: (PHAsset) -> Void
     @Environment(\.openURL) private var openURL
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 3), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 3)
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .lastTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("照片图库")
-                        .font(.system(size: 25, weight: .bold, design: .serif))
-                        .foregroundStyle(GrainTheme.paper)
-                    Text("轻点照片，自动获取 iCloud 原始文件")
-                        .font(.system(size: 9.5, design: .rounded))
-                        .foregroundStyle(GrainTheme.muted)
-                }
+                Text("照片图库")
+                    .font(.system(size: 25, weight: .bold, design: .serif))
+                    .foregroundStyle(GrainTheme.paper)
                 Spacer()
                 if !library.assets.isEmpty {
                     Text("\(library.assets.count)")
@@ -128,25 +123,24 @@ struct PhotoLibraryHome: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 6)
-            .padding(.bottom, 14)
+            .padding(.bottom, 10)
 
             if library.accessDenied {
                 permissionView
             } else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 3) {
+                    LazyVGrid(columns: columns, spacing: 6) {
                         ForEach(library.assets, id: \.localIdentifier) { asset in
                             Button {
                                 onSelect(asset)
                             } label: {
                                 AssetThumbnail(asset: asset)
-                                    .aspectRatio(1, contentMode: .fill)
                                     .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 3)
+                    .padding(.horizontal, 12)
                     .padding(.bottom, 24)
                 }
                 .scrollIndicators(.hidden)
@@ -219,6 +213,8 @@ private struct AssetThumbnail: View {
                     .foregroundStyle(GrainTheme.muted.opacity(0.5))
             }
         }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
         .clipped()
         .onAppear(perform: requestThumbnail)
         .onDisappear {

@@ -10,6 +10,7 @@ final class EditorViewModel: ObservableObject {
     @Published private(set) var photo: PhotoAsset?
     @Published private(set) var originalPreview: CGImage?
     @Published private(set) var editedPreview: CGImage?
+    @Published private(set) var histogram: RGBHistogram?
     @Published private(set) var isPreparing = false
     @Published private(set) var isRecommending = false
     @Published private(set) var isExporting = false
@@ -43,6 +44,7 @@ final class EditorViewModel: ObservableObject {
         photo = nil
         originalPreview = nil
         editedPreview = nil
+        histogram = nil
         exportResult = nil
         errorMessage = nil
         isPreparing = false
@@ -68,13 +70,12 @@ final class EditorViewModel: ObservableObject {
 
             withAnimation(.snappy(duration: 0.24)) {
                 selectedProfile = recommendation.profile
-                settings = recommendation.profile.factorySettings
-                settings.exposure += recommendation.exposureDelta
-                settings.temperature += recommendation.temperatureDelta
-                intensity = 0.82
+                settings = recommendation.settings
+                intensity = recommendation.intensity
             }
             schedulePreview()
             isRecommending = false
+            showNotice("推荐：\(recommendation.profile.name) · \(recommendation.reason)")
         }
     }
 
@@ -131,16 +132,22 @@ final class EditorViewModel: ObservableObject {
             isPreparing = true
             do {
                 let rendered = try await Task.detached(priority: .userInitiated) {
-                    try RawImageProcessor.renderPreview(
+                    let images = try RawImageProcessor.renderPreview(
                         from: photo.url,
                         profile: profile,
                         settings: settings,
                         intensity: intensity
                     )
+                    return (
+                        original: images.original,
+                        edited: images.edited,
+                        histogram: LocalLookAdvisor.histogram(from: images.edited)
+                    )
                 }.value
                 guard !Task.isCancelled else { return }
                 originalPreview = rendered.original
                 editedPreview = rendered.edited
+                histogram = rendered.histogram
             } catch {
                 if !Task.isCancelled {
                     errorMessage = error.localizedDescription
@@ -154,6 +161,9 @@ final class EditorViewModel: ObservableObject {
         errorMessage = nil
         isPreparing = true
         exportResult = nil
+        originalPreview = nil
+        editedPreview = nil
+        histogram = nil
 
         let supportedExtensions = ["arw", "srf", "sr2", "dng", "jpg", "jpeg", "heic", "heif", "png"]
         guard supportedExtensions.contains(incomingURL.pathExtension.lowercased()) else {
@@ -262,7 +272,7 @@ final class EditorViewModel: ObservableObject {
             noticeMessage = text
         }
         noticeTask = Task {
-            try? await Task.sleep(for: .seconds(1.8))
+            try? await Task.sleep(for: .seconds(2.8))
             guard !Task.isCancelled else { return }
             withAnimation(.easeIn(duration: 0.18)) {
                 noticeMessage = nil
