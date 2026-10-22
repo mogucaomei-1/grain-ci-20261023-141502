@@ -156,6 +156,46 @@ struct RawImageProcessor {
         return edited
     }
 
+    static func renderFullResolutionDisplay(
+        from url: URL,
+        profile: FilmProfile,
+        settings: FilmSettings,
+        intensity: Double,
+        crop: CropTransform,
+        mosaicStrokes: [MosaicStroke]
+    ) throws -> CGImage {
+        try autoreleasepool {
+            let image = try loadImage(from: url, draft: false)
+            let normalized = normalizedExtent(of: image)
+            let maxDimension = max(normalized.extent.width, normalized.extent.height)
+            let sourceAsset = try metadata(for: url)
+            let expectedLongEdge = max(sourceAsset.pixelWidth, sourceAsset.pixelHeight)
+            if expectedLongEdge > 0, maxDimension < Double(expectedLongEdge) * 0.90 {
+                throw ImageProcessorError.unsupportedRAW
+            }
+
+            let graded = applyFilm(
+                to: normalized,
+                profile: profile,
+                settings: settings,
+                intensity: intensity,
+                grainScale: max(1, maxDimension / 1800),
+                suppressVignette: sourceAsset.isLikelyScreenshot
+            )
+            let displayP3 = CGColorSpace(name: CGColorSpace.displayP3)
+            guard let gradedImage = context.createCGImage(
+                graded,
+                from: normalized.extent,
+                format: .RGBA8,
+                colorSpace: displayP3
+            ) else {
+                throw ImageProcessorError.cannotRender
+            }
+            let croppedImage = CropProcessor.apply(crop, to: gradedImage)
+            return MosaicProcessor.apply(mosaicStrokes, to: croppedImage)
+        }
+    }
+
     static func export(
         from url: URL,
         profile: FilmProfile,

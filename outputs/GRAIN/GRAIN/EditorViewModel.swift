@@ -409,6 +409,28 @@ final class EditorViewModel: ObservableObject {
         }
     }
 
+    func renderFullResolutionDisplay() async throws -> CGImage {
+        guard let photo else {
+            throw ImageProcessorError.cannotOpenFile
+        }
+        let profile = selectedProfile
+        let settings = settings
+        let intensity = intensity
+        let crop = crop
+        let mosaics = mosaicStrokes
+
+        return try await Task.detached(priority: .userInitiated) {
+            try RawImageProcessor.renderFullResolutionDisplay(
+                from: photo.url,
+                profile: profile,
+                settings: settings,
+                intensity: intensity,
+                crop: crop,
+                mosaicStrokes: mosaics
+            )
+        }.value
+    }
+
     private func copyIntoLibrary(_ sourceURL: URL) throws -> URL {
         let fileManager = FileManager.default
         let root = try fileManager.url(

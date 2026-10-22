@@ -554,12 +554,15 @@ private struct FullscreenPhotoView: View {
     @State private var lastScale: CGFloat = 1
     @State private var offset = CGSize.zero
     @State private var lastOffset = CGSize.zero
+    @State private var fullResolutionImage: CGImage?
+    @State private var isLoadingFullResolution = false
+    @State private var fullResolutionError: String?
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if let image = editor.editedPreview {
+            if let image = fullResolutionImage ?? editor.editedPreview {
                 GeometryReader { proxy in
                     let rect = fittedRect(for: image, in: proxy.size)
                     ZStack {
@@ -661,8 +664,32 @@ private struct FullscreenPhotoView: View {
                     }
                     .padding(.bottom, 28)
             }
+
+            if isLoadingFullResolution || fullResolutionError != nil {
+                VStack {
+                    HStack(spacing: 7) {
+                        if isLoadingFullResolution {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .tint(GrainTheme.paper)
+                        }
+                        Text(fullResolutionError == nil ? "正在载入全尺寸原图" : "无法载入全尺寸原图")
+                    }
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(GrainTheme.paper)
+                    .padding(.horizontal, 11)
+                    .frame(height: 28)
+                    .background(Color.black.opacity(0.62), in: Capsule())
+                    .padding(.top, 62)
+
+                    Spacer()
+                }
+            }
         }
         .statusBarHidden()
+        .task {
+            await loadFullResolutionImage()
+        }
     }
 
     private var magnificationGesture: some Gesture {
@@ -727,6 +754,22 @@ private struct FullscreenPhotoView: View {
             width: fitted.width,
             height: fitted.height
         )
+    }
+
+    private func loadFullResolutionImage() async {
+        guard fullResolutionImage == nil, !isLoadingFullResolution else { return }
+        isLoadingFullResolution = true
+        fullResolutionError = nil
+        defer { isLoadingFullResolution = false }
+
+        do {
+            let image = try await editor.renderFullResolutionDisplay()
+            guard !Task.isCancelled else { return }
+            fullResolutionImage = image
+        } catch {
+            guard !Task.isCancelled else { return }
+            fullResolutionError = error.localizedDescription
+        }
     }
 }
 
