@@ -108,6 +108,7 @@
         <div class="top-actions">
           <button class="round" id="albumButton" title="从相册选择">▧</button>
           <button class="round" id="filesButton" title="从文件导入">⌑</button>
+          <button class="round" id="histogramButton" title="显示或隐藏直方图" style="color:var(--accent)">▥</button>
           <button class="round export" id="openExport">↗</button>
         </div>
         <input id="fileInput" type="file" accept=".arw,.ARW,.dng,.DNG,image/*">
@@ -280,6 +281,7 @@
     document.querySelectorAll('.format').forEach(b=>b.onclick=()=>{document.querySelectorAll('.format').forEach(x=>x.classList.toggle('active',x===b));const t=b.querySelector('strong').textContent;$('#formatFact').textContent=t;document.querySelector('.export-btn small').textContent=t});
     $('#filesButton').onclick=()=>$('#fileInput').click();
     $('#albumButton').onclick=()=>alert('iOS App 首页已直接显示相册网格。');
+    $('#histogramButton').onclick=()=>{const h=document.querySelector('.histogram');const hidden=h.style.display==='none';h.style.display=hidden?'block':'none';$('#histogramButton').style.color=hidden?'var(--accent)':'var(--muted)'};
     $('#copyPreset').onclick=()=>$('#copyPreset').textContent='已复制';
     $('#pastePreset').onclick=()=>choose('portra');
     $('#fileInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const ext=f.name.split('.').pop().toUpperCase();if(ext==='ARW'){alert('浏览器原型不能解码 ARW；请使用 iOS 1.1 测试版。');return}const url=URL.createObjectURL(f);$('#editedPhoto').src=url;$('#originalPhoto').src=url;const i=new Image();i.onload=()=>{$('#dims').textContent=i.naturalWidth+' × '+i.naturalHeight};i.src=url};

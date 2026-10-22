@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var editor: EditorViewModel
     @StateObject private var photoLibrary = PhotoLibraryViewModel()
+    @AppStorage("showHistogram") private var showHistogram = true
     @State private var showPhotoPicker = false
     @State private var showDocumentPicker = false
     @State private var showExportSheet = false
@@ -18,6 +19,12 @@ struct RootView: View {
                     onBack: editor.returnHome,
                     onAlbum: requestPhotoLibrary,
                     onFiles: { showDocumentPicker = true },
+                    histogramVisible: showHistogram,
+                    onToggleHistogram: {
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            showHistogram.toggle()
+                        }
+                    },
                     onExport: {
                         editor.exportResult = nil
                         showExportSheet = true
@@ -29,7 +36,7 @@ struct RootView: View {
                         importLibraryAsset(asset)
                     }
                 } else {
-                    EditorWorkspace()
+                    EditorWorkspace(showHistogram: showHistogram)
                 }
             }
         }
@@ -111,6 +118,8 @@ private struct MinimalTopBar: View {
     let onBack: () -> Void
     let onAlbum: () -> Void
     let onFiles: () -> Void
+    let histogramVisible: Bool
+    let onToggleHistogram: () -> Void
     let onExport: () -> Void
 
     var body: some View {
@@ -154,6 +163,16 @@ private struct MinimalTopBar: View {
             .buttonStyle(.plain)
             .accessibilityLabel("从文件导入")
 
+            Button(action: onToggleHistogram) {
+                Image(systemName: "waveform.path.ecg.rectangle")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(histogramVisible ? GrainTheme.accent : GrainTheme.muted)
+                    .frame(width: 38, height: 38)
+                    .background(GrainTheme.raised, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(histogramVisible ? "隐藏直方图" : "显示直方图")
+
             Button(action: onExport) {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 14, weight: .bold))
@@ -171,9 +190,11 @@ private struct MinimalTopBar: View {
 }
 
 private struct EditorWorkspace: View {
+    let showHistogram: Bool
+
     var body: some View {
         VStack(spacing: 0) {
-            PhotoEditorCanvas()
+            PhotoEditorCanvas(showHistogram: showHistogram)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             FilmPresetBar()
@@ -187,6 +208,7 @@ private struct EditorWorkspace: View {
 
 private struct PhotoEditorCanvas: View {
     @EnvironmentObject private var editor: EditorViewModel
+    let showHistogram: Bool
     @State private var showOriginal = false
     @State private var showFullscreen = false
 
@@ -226,7 +248,7 @@ private struct PhotoEditorCanvas: View {
 
                             Spacer()
 
-                            if let histogram = editor.histogram {
+                            if showHistogram, let histogram = editor.histogram {
                                 HistogramView(data: histogram)
                                     .frame(width: 82, height: 46)
                                     .offset(x: 5, y: -6)
