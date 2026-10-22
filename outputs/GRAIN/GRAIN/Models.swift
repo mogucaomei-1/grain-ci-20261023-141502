@@ -17,9 +17,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
     case superia400
     case cinestill
     case vision250d
-    case hp5
-    case triX
-    case delta3200
 
     var id: String { rawValue }
 
@@ -39,9 +36,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .superia400: "富士 超级 400"
         case .cinestill: "电影 夜光 800T"
         case .vision250d: "电影 Vision3 250D"
-        case .hp5: "伊尔福 HP5 Plus"
-        case .triX: "柯达 Tri-X 400"
-        case .delta3200: "伊尔福 Delta 3200"
         }
     }
 
@@ -61,9 +55,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .superia400: "超级"
         case .cinestill: "夜光"
         case .vision250d: "250D"
-        case .hp5: "HP5"
-        case .triX: "Tri-X"
-        case .delta3200: "Delta"
         }
     }
 
@@ -83,9 +74,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .superia400: "青绿阴影 · 日常街拍"
         case .cinestill: "钨丝蓝 · 夜景红晕"
         case .vision250d: "柔和日光 · 电影宽容度"
-        case .hp5: "银盐灰阶 · 粗粝颗粒"
-        case .triX: "经典黑白 · 高反差"
-        case .delta3200: "暗光银盐 · 强颗粒"
         }
     }
 
@@ -105,14 +93,7 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .superia400: [0x3D765D, 0x8DB78A, 0xD4C8A6]
         case .cinestill: [0x2D5568, 0xB44E42, 0xD8B4A1]
         case .vision250d: [0x536F6B, 0xBE8B62, 0xD7C3A1]
-        case .hp5: [0x2A2A28, 0x84817A, 0xD6D0C4]
-        case .triX: [0x20201F, 0x6D6B66, 0xC5C0B6]
-        case .delta3200: [0x292A29, 0x777A78, 0xCFCFC9]
         }
-    }
-
-    var isMonochrome: Bool {
-        self == .hp5 || self == .triX || self == .delta3200
     }
 
     var factorySettings: FilmSettings {
@@ -187,21 +168,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
                   highlights: -6, shadows: 8, whites: -2, blacks: 4,
                   contrast: 0, vibrance: 5, saturation: -2, clarity: 0,
                   fade: 8, grain: 16, vignette: 12, sharpness: 5)
-        case .hp5:
-            .init(exposure: 0.04, temperature: 6500, tint: 0,
-                  highlights: -4, shadows: 8, whites: 0, blacks: 6,
-                  contrast: 14, vibrance: 0, saturation: 0, clarity: 6,
-                  fade: 8, grain: 36, vignette: 16, sharpness: 10)
-        case .triX:
-            .init(exposure: 0.05, temperature: 6500, tint: 0,
-                  highlights: -6, shadows: 8, whites: 2, blacks: 5,
-                  contrast: 12, vibrance: 0, saturation: 0, clarity: 8,
-                  fade: 8, grain: 32, vignette: 18, sharpness: 12)
-        case .delta3200:
-            .init(exposure: 0.10, temperature: 6500, tint: 0,
-                  highlights: -10, shadows: 12, whites: -3, blacks: 8,
-                  contrast: 8, vibrance: 0, saturation: 0, clarity: 0,
-                  fade: 12, grain: 45, vignette: 22, sharpness: 4)
         }
     }
 }

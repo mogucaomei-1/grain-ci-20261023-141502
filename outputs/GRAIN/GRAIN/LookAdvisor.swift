@@ -27,7 +27,7 @@ enum LocalLookAdvisor {
         let scene: FilmProfile
         let sceneReason: String
         if sample.saturation < 0.045 {
-            scene = .triX
+            scene = .classicChrome
             sceneReason = "低饱和画面"
         } else if sample.luminance < 0.24 && sample.saturation > 0.16 {
             scene = .cinestill

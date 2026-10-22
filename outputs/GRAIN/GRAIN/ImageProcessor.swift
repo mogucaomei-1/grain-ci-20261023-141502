@@ -416,16 +416,6 @@ struct RawImageProcessor {
             ])
         }
 
-        if profile.isMonochrome {
-            graded = graded.applyingFilter("CIPhotoEffectMono")
-                .applyingFilter("CIColorMatrix", parameters: [
-                    "inputRVector": CIVector(x: 1.02, y: 0.99, z: 0.93, w: 0),
-                    "inputGVector": CIVector(x: 1.02, y: 0.99, z: 0.93, w: 0),
-                    "inputBVector": CIVector(x: 1.02, y: 0.99, z: 0.93, w: 0),
-                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-                ])
-        }
-
         let clarity = settings.clarity * amount
         if clarity > 0.2 {
             graded = graded.applyingFilter("CIUnsharpMask", parameters: [
