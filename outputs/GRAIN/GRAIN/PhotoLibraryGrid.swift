@@ -158,6 +158,7 @@ struct PhotoLibraryHome: View {
                             } label: {
                                 AssetThumbnail(asset: asset)
                                     .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                                    .id(asset.localIdentifier)
                             }
                             .buttonStyle(.plain)
                             .disabled(library.isDownloadingOriginal)
@@ -222,6 +223,7 @@ private struct AssetThumbnail: View {
     let asset: PHAsset
     @State private var image: UIImage?
     @State private var requestID: PHImageRequestID?
+    @State private var requestedIdentifier: String?
 
     var body: some View {
         Color.clear
@@ -252,12 +254,19 @@ private struct AssetThumbnail: View {
     }
 
     private func requestThumbnail() {
-        guard image == nil else { return }
+        guard image == nil, requestedIdentifier != asset.localIdentifier else { return }
+        if let requestID {
+            PHImageManager.default().cancelImageRequest(requestID)
+        }
+        requestedIdentifier = asset.localIdentifier
+
         let target = CGSize(width: 360, height: 360)
         let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
-        options.resizeMode = .fast
+        options.deliveryMode = .highQualityFormat
+        options.resizeMode = .exact
+        options.version = .current
         options.isNetworkAccessAllowed = true
+        let identifier = asset.localIdentifier
 
         requestID = PHImageManager.default().requestImage(
             for: asset,
@@ -265,8 +274,12 @@ private struct AssetThumbnail: View {
             contentMode: .aspectFill,
             options: options
         ) { result, info in
+            if let degraded = info?[PHImageResultIsDegradedKey] as? Bool, degraded {
+                return
+            }
             if let result {
                 DispatchQueue.main.async {
+                    guard requestedIdentifier == identifier else { return }
                     image = result
                 }
             }

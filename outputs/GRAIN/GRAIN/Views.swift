@@ -341,6 +341,7 @@ private struct EditorWorkspace: View {
 
 private struct PhotoEditorCanvas: View {
     @EnvironmentObject private var editor: EditorViewModel
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     let showHistogram: Bool
     @Binding var selectedTextID: UUID?
     let onEditText: (UUID) -> Void
@@ -377,31 +378,31 @@ private struct PhotoEditorCanvas: View {
                             showFullscreen = true
                         }
 
-                    ForEach(editor.textOverlays) { overlay in
-                        EditableTextOverlayView(
-                            overlay: overlay,
-                            selected: selectedTextID == overlay.id,
-                            canvasSize: CGSize(width: proxy.size.width, height: imageHeight),
-                            onSelect: {
-                                selectedTextID = overlay.id
-                            },
-                            onEdit: {
-                                onEditText(overlay.id)
-                            },
-                            onDelete: {
-                                editor.deleteTextOverlay(id: overlay.id)
-                                selectedTextID = nil
-                            },
-                            onMoveStart: editor.recordUndoSnapshot,
-                            onMove: { point in
-                                editor.moveTextOverlay(
-                                    id: overlay.id,
-                                    x: point.x / max(proxy.size.width, 1),
-                                    y: point.y / max(imageHeight, 1)
-                                )
-                            }
-                        )
-                    }
+                    TextOverlayInteractionView(
+                        overlays: editor.textOverlays,
+                        selectedID: selectedTextID,
+                        canvasSize: CGSize(width: proxy.size.width, height: imageHeight),
+                        hapticsEnabled: hapticsEnabled,
+                        onSelect: { selectedTextID = $0 },
+                        onEdit: onEditText,
+                        onDelete: { id in
+                            editor.deleteTextOverlay(id: id)
+                            selectedTextID = nil
+                        },
+                        onMoveStart: editor.recordUndoSnapshot,
+                        onMove: { id, normalizedCenter in
+                            editor.moveTextOverlay(
+                                id: id,
+                                x: normalizedCenter.x,
+                                y: normalizedCenter.y
+                            )
+                        },
+                        onTapEmpty: {
+                            selectedTextID = nil
+                            showFullscreen = true
+                        }
+                    )
+                    .frame(width: proxy.size.width, height: imageHeight)
 
                     VStack {
                         HStack(alignment: .top, spacing: 12) {
@@ -485,192 +486,6 @@ private struct PhotoEditorCanvas: View {
             return 3 / 2
         }
         return CGFloat(photo.pixelWidth) / CGFloat(photo.pixelHeight)
-    }
-}
-
-private struct EditableTextOverlayView: View {
-    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
-    let overlay: PhotoTextOverlay
-    let selected: Bool
-    let canvasSize: CGSize
-    let onSelect: () -> Void
-    let onEdit: () -> Void
-    let onDelete: () -> Void
-    let onMoveStart: () -> Void
-    let onMove: (CGPoint) -> Void
-    @State private var dragOrigin: CGPoint?
-    @State private var pendingCenter: CGPoint?
-    @State private var dragOffset = CGSize.zero
-    @State private var isDragging = false
-    @State private var lastSnapKey: String?
-    @State private var lastDragHapticDistance: CGFloat = 0
-
-    var body: some View {
-        Text(overlay.text.isEmpty ? " " : overlay.text)
-            .font(
-                overlay.font.swiftUIFont(
-                    size: max(10, min(canvasSize.width, canvasSize.height) * overlay.fontSize)
-                )
-            )
-            .foregroundStyle(
-                Color(
-                    red: overlay.red,
-                    green: overlay.green,
-                    blue: overlay.blue,
-                    opacity: overlay.alpha
-                )
-            )
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .shadow(
-                color: isDragging ? .clear : .black.opacity(0.22),
-                radius: isDragging ? 0 : 2,
-                y: isDragging ? 0 : 1
-            )
-            .padding(9)
-            .overlay {
-                if selected {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(GrainTheme.paper.opacity(0.9), lineWidth: 0.9)
-                        .allowsHitTesting(false)
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if selected {
-                    Button {
-                        GrainHaptics.lightImpact(enabled: hapticsEnabled)
-                        onDelete()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 22, height: 22)
-                            .background(Color(hex: 0xB64532), in: Circle())
-                            .overlay {
-                                Circle().stroke(Color.white.opacity(0.75), lineWidth: 0.7)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .offset(x: 11, y: -11)
-                    .zIndex(2)
-                    .accessibilityLabel("删除文字")
-                }
-            }
-            .padding(14)
-            .contentShape(Rectangle())
-            .gesture(textDragGesture)
-            .onTapGesture {
-                if selected {
-                    onEdit()
-                } else {
-                    onSelect()
-                }
-            }
-            .compositingGroup()
-            .position(
-                x: overlay.x * canvasSize.width,
-                y: overlay.y * canvasSize.height
-            )
-            .offset(dragOffset)
-            .transaction { transaction in
-                transaction.animation = nil
-            }
-            .zIndex(selected ? 2 : 1)
-    }
-
-    private var textDragGesture: some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                if dragOrigin == nil {
-                    dragOrigin = CGPoint(
-                        x: overlay.x * canvasSize.width,
-                        y: overlay.y * canvasSize.height
-                    )
-                    lastDragHapticDistance = 0
-                    isDragging = true
-                    onMoveStart()
-                }
-                guard let origin = dragOrigin else { return }
-                let rawPoint = CGPoint(
-                    x: origin.x + value.translation.width,
-                    y: origin.y + value.translation.height
-                )
-                let snapped = snappedPoint(rawPoint)
-                pendingCenter = snapped.point
-                dragOffset = CGSize(
-                    width: snapped.point.x - origin.x,
-                    height: snapped.point.y - origin.y
-                )
-
-                let travel = hypot(value.translation.width, value.translation.height)
-                let gridKey = snapped.gridKey
-                let enteredGridPoint = gridKey != nil && gridKey != lastSnapKey
-                if snapped.key != lastSnapKey {
-                    lastSnapKey = snapped.key
-                    if enteredGridPoint {
-                        lastDragHapticDistance = travel
-                        GrainHaptics.lightImpact(enabled: hapticsEnabled)
-                    }
-                }
-                if !enteredGridPoint,
-                   travel - lastDragHapticDistance >= 18 {
-                    lastDragHapticDistance = travel
-                    GrainHaptics.selection(enabled: hapticsEnabled)
-                }
-            }
-            .onEnded { _ in
-                withTransaction(Transaction(animation: nil)) {
-                    if let pendingCenter {
-                        onMove(pendingCenter)
-                    }
-                    dragOrigin = nil
-                    pendingCenter = nil
-                    dragOffset = .zero
-                    isDragging = false
-                    lastSnapKey = nil
-                    lastDragHapticDistance = 0
-                }
-            }
-    }
-
-    private func snappedPoint(_ point: CGPoint) -> (point: CGPoint, key: String?, gridKey: String?) {
-        let snapDistance: CGFloat = 20
-        let anchors: [CGFloat] = [0.15, 0.50, 0.85]
-        var snappedX = point.x
-        var snappedY = point.y
-        var xKey: Int?
-        var yKey: Int?
-
-        for (index, anchor) in anchors.enumerated() {
-            let targetX = anchor * canvasSize.width
-            if abs(point.x - targetX) <= snapDistance {
-                snappedX = targetX
-                xKey = index
-                break
-            }
-        }
-        for (index, anchor) in anchors.enumerated() {
-            let targetY = anchor * canvasSize.height
-            if abs(point.y - targetY) <= snapDistance {
-                snappedY = targetY
-                yKey = index
-                break
-            }
-        }
-
-        let key: String?
-        let gridKey: String?
-        if let xKey, let yKey {
-            key = "\(xKey)-\(yKey)"
-            gridKey = key
-        } else if xKey != nil || yKey != nil {
-            key = "\(xKey ?? -1)-\(yKey ?? -1)"
-            gridKey = nil
-        } else {
-            key = nil
-            gridKey = nil
-        }
-        return (CGPoint(x: snappedX, y: snappedY), key, gridKey)
     }
 }
 
@@ -915,6 +730,8 @@ private struct FullscreenPhotoView: View {
 
 private struct FilmPresetBar: View {
     @EnvironmentObject private var editor: EditorViewModel
+    @AppStorage("filmOrder") private var filmOrder = ""
+    @State private var showFilmOrderEditor = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1009,7 +826,7 @@ private struct FilmPresetBar: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 5) {
-                    ForEach(FilmProfile.allCases) { profile in
+                    ForEach(orderedProfiles) { profile in
                         Button {
                             editor.selectProfile(profile)
                         } label: {
@@ -1020,11 +837,46 @@ private struct FilmPresetBar: View {
                         }
                         .buttonStyle(.plain)
                     }
+
+                    Button {
+                        showFilmOrderEditor = true
+                    } label: {
+                        VStack(spacing: 7) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(GrainTheme.paper)
+                                .frame(width: 71, height: 49)
+                                .background(GrainTheme.raised, in: RoundedRectangle(cornerRadius: 9))
+
+                            Text("编辑")
+                                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                                .foregroundStyle(GrainTheme.paper)
+                                .frame(width: 72)
+                        }
+                        .padding(4)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("编辑胶片排序")
                 }
                 .padding(.horizontal, 16)
             }
         }
         .padding(.top, 8)
+        .sheet(isPresented: $showFilmOrderEditor) {
+            FilmOrderEditorView()
+                .presentationDetents([.height(520)])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var orderedProfiles: [FilmProfile] {
+        var seen = Set<String>()
+        let stored = filmOrder
+            .split(separator: ",")
+            .compactMap { FilmProfile(rawValue: String($0)) }
+            .filter { seen.insert($0.rawValue).inserted }
+        let missing = FilmProfile.allCases.filter { !seen.contains($0.rawValue) }
+        return stored + missing
     }
 }
 

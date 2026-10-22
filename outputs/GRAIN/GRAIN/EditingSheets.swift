@@ -265,6 +265,124 @@ struct ImageInfoSheet: View {
     }
 }
 
+struct FilmOrderEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("filmOrder") private var filmOrder = ""
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
+    @State private var profiles = FilmProfile.allCases
+    @State private var hasLoaded = false
+
+    var body: some View {
+        ZStack {
+            GrainTheme.black.ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("胶片排序")
+                            .font(.system(size: 25, weight: .bold, design: .serif))
+                            .foregroundStyle(GrainTheme.paper)
+                        Text("拖动右侧手柄调整顺序，返回后立即同步到胶片栏")
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundStyle(GrainTheme.muted)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        resetOrder()
+                    } label: {
+                        Text("恢复默认")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundStyle(GrainTheme.muted)
+                            .padding(.horizontal, 10)
+                            .frame(height: 29)
+                            .background(GrainTheme.raised, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("完成")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(GrainTheme.black)
+                            .padding(.horizontal, 13)
+                            .frame(height: 31)
+                            .background(GrainTheme.paper, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 14)
+
+                List {
+                    ForEach(profiles) { profile in
+                        HStack(spacing: 12) {
+                            LinearGradient(
+                                colors: profile.uiPalette,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .frame(width: 42, height: 31)
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(profile.name)
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(GrainTheme.paper)
+                                Text(profile.descriptor)
+                                    .font(.system(size: 8.5, design: .rounded))
+                                    .foregroundStyle(GrainTheme.muted)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer()
+                        }
+                        .listRowBackground(GrainTheme.surface)
+                        .listRowSeparatorTint(GrainTheme.line)
+                    }
+                    .onMove(perform: move)
+                }
+                .scrollContentBackground(.hidden)
+                .environment(\.editMode, .constant(.active))
+            }
+        }
+        .onAppear {
+            guard !hasLoaded else { return }
+            hasLoaded = true
+            profiles = orderedProfiles(from: filmOrder)
+        }
+    }
+
+    private func move(from source: IndexSet, to destination: Int) {
+        profiles.move(fromOffsets: source, toOffset: destination)
+        persistOrder()
+    }
+
+    private func resetOrder() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            profiles = FilmProfile.allCases
+        }
+        persistOrder()
+    }
+
+    private func persistOrder() {
+        filmOrder = profiles.map(\.rawValue).joined(separator: ",")
+        GrainHaptics.lightImpact(enabled: hapticsEnabled)
+    }
+
+    private func orderedProfiles(from value: String) -> [FilmProfile] {
+        var seen = Set<String>()
+        let stored = value
+            .split(separator: ",")
+            .compactMap { FilmProfile(rawValue: String($0)) }
+            .filter { seen.insert($0.rawValue).inserted }
+        return stored + FilmProfile.allCases.filter { !seen.contains($0.rawValue) }
+    }
+}
+
 struct AppSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
