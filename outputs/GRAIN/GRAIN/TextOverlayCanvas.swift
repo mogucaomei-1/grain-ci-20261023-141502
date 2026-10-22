@@ -315,8 +315,8 @@ private final class TextOverlayItemUIView: UIView {
         case .changed:
             let translation = gesture.translation(in: superview)
             let desired = CGPoint(
-                x: dragOrigin.x + translation.width,
-                y: dragOrigin.y + translation.height
+                x: dragOrigin.x + translation.x,
+                y: dragOrigin.y + translation.y
             )
             let snapped = snappedCenter(desired)
             center = snapped.center
