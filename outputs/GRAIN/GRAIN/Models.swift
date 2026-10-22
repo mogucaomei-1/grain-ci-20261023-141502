@@ -293,6 +293,7 @@ struct PhotoAsset: Identifiable, Equatable, Sendable {
     let capturedAt: Date?
     let hasLocation: Bool
     let orientation: UInt32
+    let isLikelyScreenshot: Bool
 
     var dimensionsLabel: String {
         "\(pixelWidth) × \(pixelHeight)"
@@ -312,6 +313,10 @@ struct PhotoAsset: Identifiable, Equatable, Sendable {
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: " ")
             .replacingOccurrences(of: "Sony Sony", with: "Sony")
+    }
+
+    var sourceKindLabel: String {
+        isLikelyScreenshot ? "SCREENSHOT" : "RAW"
     }
 }
 

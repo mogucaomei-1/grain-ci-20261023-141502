@@ -25,6 +25,8 @@ final class EditorViewModel: ObservableObject {
     private var previewTask: Task<Void, Never>?
     private var noticeTask: Task<Void, Never>?
     private var sourcePreview: CGImage?
+    private var previewNeedsUpdate = false
+    private var previewGeneration = 0
 
     var canExport: Bool {
         photo != nil && !isPreparing && !isExporting
@@ -42,6 +44,8 @@ final class EditorViewModel: ObservableObject {
     func returnHome() {
         previewTask?.cancel()
         previewTask = nil
+        previewNeedsUpdate = false
+        previewGeneration += 1
         photo = nil
         sourcePreview = nil
         originalPreview = nil
@@ -129,34 +133,50 @@ final class EditorViewModel: ObservableObject {
     }
 
     func schedulePreview() {
-        guard let sourcePreview else { return }
-        previewTask?.cancel()
-        let profile = selectedProfile
-        let settings = settings
-        let intensity = intensity
+        guard sourcePreview != nil else { return }
+        previewNeedsUpdate = true
+        guard previewTask == nil else { return }
 
-        previewTask = Task {
-            try? await Task.sleep(for: .milliseconds(12))
-            guard !Task.isCancelled else { return }
-            do {
-                let rendered = try await Task.detached(priority: .userInitiated) {
-                    let edited = try RawImageProcessor.renderGradedPreview(
-                        source: sourcePreview,
-                        profile: profile,
-                        settings: settings,
-                        intensity: intensity
-                    )
-                    return (
-                        edited: edited,
-                        histogram: LocalLookAdvisor.histogram(from: edited)
-                    )
-                }.value
-                guard !Task.isCancelled else { return }
-                editedPreview = rendered.edited
-                histogram = rendered.histogram
-            } catch {
-                if !Task.isCancelled {
-                    errorMessage = error.localizedDescription
+        let generation = previewGeneration
+        previewTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled, self.previewGeneration == generation {
+                guard self.previewNeedsUpdate, let sourcePreview = self.sourcePreview else { break }
+                self.previewNeedsUpdate = false
+                let profile = self.selectedProfile
+                let settings = self.settings
+                let intensity = self.intensity
+                let suppressVignette = self.photo?.isLikelyScreenshot ?? false
+
+                do {
+                    let rendered = try await Task.detached(priority: .userInitiated) {
+                        let edited = try RawImageProcessor.renderGradedPreview(
+                            source: sourcePreview,
+                            profile: profile,
+                            settings: settings,
+                            intensity: intensity,
+                            suppressVignette: suppressVignette
+                        )
+                        return (
+                            edited: edited,
+                            histogram: LocalLookAdvisor.histogram(from: edited)
+                        )
+                    }.value
+                    guard !Task.isCancelled, self.previewGeneration == generation else { break }
+                    self.editedPreview = rendered.edited
+                    self.histogram = rendered.histogram
+                } catch {
+                    if !Task.isCancelled {
+                        self.errorMessage = error.localizedDescription
+                    }
+                    break
+                }
+            }
+
+            if self.previewGeneration == generation {
+                self.previewTask = nil
+                if self.previewNeedsUpdate {
+                    self.schedulePreview()
                 }
             }
         }
@@ -167,6 +187,9 @@ final class EditorViewModel: ObservableObject {
         isPreparing = true
         exportResult = nil
         previewTask?.cancel()
+        previewTask = nil
+        previewNeedsUpdate = false
+        previewGeneration += 1
         sourcePreview = nil
         originalPreview = nil
         editedPreview = nil
@@ -209,7 +232,7 @@ final class EditorViewModel: ObservableObject {
                 sourcePreview = source
                 originalPreview = source
                 isPreparing = false
-                schedulePreview()
+                recommendLook()
             } catch {
                 guard !Task.isCancelled else { return }
                 isPreparing = false

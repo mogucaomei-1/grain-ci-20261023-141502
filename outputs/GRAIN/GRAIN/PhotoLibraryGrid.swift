@@ -31,7 +31,6 @@ final class PhotoLibraryViewModel: ObservableObject {
 
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        options.fetchLimit = 500
         let result = PHAsset.fetchAssets(with: .image, options: options)
         var fetchedAssets: [PHAsset] = []
         fetchedAssets.reserveCapacity(result.count)
@@ -110,10 +109,7 @@ struct PhotoLibraryHome: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .lastTextBaseline) {
-                Text("照片图库")
-                    .font(.system(size: 25, weight: .bold, design: .serif))
-                    .foregroundStyle(GrainTheme.paper)
+            HStack {
                 Spacer()
                 if !library.assets.isEmpty {
                     Text("\(library.assets.count)")
@@ -121,9 +117,9 @@ struct PhotoLibraryHome: View {
                         .foregroundStyle(GrainTheme.muted)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 6)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 12)
+            .padding(.top, 2)
+            .padding(.bottom, 4)
 
             if library.accessDenied {
                 permissionView

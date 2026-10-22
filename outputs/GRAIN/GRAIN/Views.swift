@@ -5,7 +5,6 @@ struct RootView: View {
     @EnvironmentObject private var editor: EditorViewModel
     @StateObject private var photoLibrary = PhotoLibraryViewModel()
     @AppStorage("showHistogram") private var showHistogram = true
-    @State private var showPhotoPicker = false
     @State private var showDocumentPicker = false
     @State private var showExportSheet = false
 
@@ -17,7 +16,6 @@ struct RootView: View {
                 MinimalTopBar(
                     hasPhoto: editor.photo != nil,
                     onBack: editor.returnHome,
-                    onAlbum: requestPhotoLibrary,
                     onFiles: { showDocumentPicker = true },
                     histogramVisible: showHistogram,
                     onToggleHistogram: {
@@ -39,15 +37,6 @@ struct RootView: View {
                     EditorWorkspace(showHistogram: showHistogram)
                 }
             }
-        }
-        .fullScreenCover(isPresented: $showPhotoPicker) {
-            PhotosRawImporter { url in
-                showPhotoPicker = false
-                editor.importPhoto(from: url)
-            } onCancel: {
-                showPhotoPicker = false
-            }
-            .ignoresSafeArea()
         }
         .sheet(isPresented: $showDocumentPicker) {
             DocumentRawImporter { url in
@@ -93,16 +82,6 @@ struct RootView: View {
         }
     }
 
-    private func requestPhotoLibrary() {
-        Task {
-            if await PhotoLibraryAccess.request() {
-                showPhotoPicker = true
-            } else {
-                editor.errorMessage = "照片读取权限未开启。请前往“设置 → GRAIN → 照片”允许读取，才能从 iCloud 下载原始 RAW。"
-            }
-        }
-    }
-
     private func importLibraryAsset(_ asset: PHAsset) {
         Task {
             do {
@@ -118,7 +97,6 @@ struct RootView: View {
 private struct MinimalTopBar: View {
     let hasPhoto: Bool
     let onBack: () -> Void
-    let onAlbum: () -> Void
     let onFiles: () -> Void
     let histogramVisible: Bool
     let onToggleHistogram: () -> Void
@@ -146,15 +124,6 @@ private struct MinimalTopBar: View {
             }
 
             Spacer()
-
-            Button(action: onAlbum) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 38, height: 38)
-                    .background(GrainTheme.raised, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("从相册选择")
 
             Button(action: onFiles) {
                 Image(systemName: "folder")
@@ -238,8 +207,8 @@ private struct PhotoEditorCanvas: View {
                     }
 
                     VStack {
-                        HStack {
-                            Label("RAW", systemImage: "circle.fill")
+                        HStack(alignment: .top, spacing: 12) {
+                            Label(editor.photo?.sourceKindLabel ?? "RAW", systemImage: "circle.fill")
                                 .labelStyle(.titleAndIcon)
                                 .font(.system(size: 8, weight: .bold, design: .monospaced))
                                 .tracking(0.8)

@@ -53,6 +53,13 @@ struct RawImageProcessor {
             formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
             return formatter.date(from: $0)
         }
+        let cameraMake = tiff[kCGImagePropertyTIFFMake] as? String ?? ""
+        let cameraModel = tiff[kCGImagePropertyTIFFModel] as? String ?? ""
+        let longEdge = max(width, height)
+        let shortEdge = max(1, min(width, height))
+        let isLikelyScreenshot = cameraMake.isEmpty
+            && cameraModel.isEmpty
+            && Double(longEdge) / Double(shortEdge) > 1.72
 
         return PhotoAsset(
             url: url,
@@ -60,12 +67,13 @@ struct RawImageProcessor {
             pixelWidth: width,
             pixelHeight: height,
             fileSize: fileSize,
-            cameraMake: tiff[kCGImagePropertyTIFFMake] as? String ?? "",
-            cameraModel: tiff[kCGImagePropertyTIFFModel] as? String ?? "",
+            cameraMake: cameraMake,
+            cameraModel: cameraModel,
             lensModel: exif[kCGImagePropertyExifLensModel] as? String ?? "",
             capturedAt: date,
             hasLocation: gps?.isEmpty == false,
-            orientation: rawOrientation
+            orientation: rawOrientation,
+            isLikelyScreenshot: isLikelyScreenshot
         )
     }
 
@@ -76,11 +84,13 @@ struct RawImageProcessor {
         intensity: Double
     ) throws -> (original: CGImage, edited: CGImage) {
         let original = try renderSourcePreview(from: url)
+        let asset = try metadata(for: url)
         let edited = try renderGradedPreview(
             source: original,
             profile: profile,
             settings: settings,
-            intensity: intensity
+            intensity: intensity,
+            suppressVignette: asset.isLikelyScreenshot
         )
         return (original, edited)
     }
@@ -89,7 +99,9 @@ struct RawImageProcessor {
         let image = try loadImage(from: url, draft: true)
         let normalized = normalizedExtent(of: image)
         let maxDimension = max(normalized.extent.width, normalized.extent.height)
-        let scale = min(1, 1800 / maxDimension)
+        // Interactive previews stay just above iPhone display resolution.
+        // Export always decodes the RAW again at its native dimensions.
+        let scale = min(1, 1280 / maxDimension)
         let preview = normalized.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
 
         guard let original = context.createCGImage(preview, from: preview.extent) else {
@@ -102,7 +114,8 @@ struct RawImageProcessor {
         source: CGImage,
         profile: FilmProfile,
         settings: FilmSettings,
-        intensity: Double
+        intensity: Double,
+        suppressVignette: Bool = false
     ) throws -> CGImage {
         let preview = CIImage(cgImage: source)
         let graded = applyFilm(
@@ -110,7 +123,8 @@ struct RawImageProcessor {
             profile: profile,
             settings: settings,
             intensity: intensity,
-            grainScale: 1
+            grainScale: 1,
+            suppressVignette: suppressVignette
         )
 
         guard let edited = context.createCGImage(graded, from: preview.extent) else {
@@ -142,7 +156,8 @@ struct RawImageProcessor {
                 profile: profile,
                 settings: settings,
                 intensity: intensity,
-                grainScale: max(1, maxDimension / 1800)
+                grainScale: max(1, maxDimension / 1800),
+                suppressVignette: sourceAsset.isLikelyScreenshot
             )
 
             let displayP3 = CGColorSpace(name: CGColorSpace.displayP3)
@@ -276,7 +291,8 @@ struct RawImageProcessor {
         profile: FilmProfile,
         settings: FilmSettings,
         intensity: Double,
-        grainScale: Double
+        grainScale: Double,
+        suppressVignette: Bool = false
     ) -> CIImage {
         let amount = min(max(intensity, 0), 1)
         let extent = input.extent
@@ -404,7 +420,7 @@ struct RawImageProcessor {
             ])
         }
 
-        let vignette = settings.vignette / 100 * amount
+        let vignette = suppressVignette ? 0 : settings.vignette / 100 * amount
         if vignette > 0.001 {
             graded = graded.applyingFilter("CIVignette", parameters: [
                 kCIInputIntensityKey: vignette * 1.8,
