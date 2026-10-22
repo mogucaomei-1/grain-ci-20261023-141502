@@ -1,6 +1,9 @@
 import CoreGraphics
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @MainActor
 final class EditorViewModel: ObservableObject {
@@ -16,8 +19,10 @@ final class EditorViewModel: ObservableObject {
     @Published var exportOptions = ExportOptions()
     @Published var errorMessage: String?
     @Published var exportResult: ExportResult?
+    @Published var noticeMessage: String?
 
     private var previewTask: Task<Void, Never>?
+    private var noticeTask: Task<Void, Never>?
 
     var canExport: Bool {
         photo != nil && !isPreparing && !isExporting
@@ -71,6 +76,46 @@ final class EditorViewModel: ObservableObject {
             schedulePreview()
             isRecommending = false
         }
+    }
+
+    func copyPreset() {
+        guard photo != nil else { return }
+#if canImport(UIKit)
+        do {
+            let preset = PresetClipboard(
+                profile: selectedProfile,
+                settings: settings,
+                intensity: intensity
+            )
+            let data = try JSONEncoder().encode(preset)
+            UIPasteboard.general.string = "GRAIN-PRESET-V1:\(data.base64EncodedString())"
+            showNotice("已复制当前调色预设")
+        } catch {
+            errorMessage = "复制预设失败：\(error.localizedDescription)"
+        }
+#endif
+    }
+
+    func pastePreset() {
+#if canImport(UIKit)
+        guard let text = UIPasteboard.general.string,
+              text.hasPrefix("GRAIN-PRESET-V1:"),
+              let data = Data(base64Encoded: String(text.dropFirst("GRAIN-PRESET-V1:".count))),
+              let preset = try? JSONDecoder().decode(PresetClipboard.self, from: data),
+              preset.version == 1
+        else {
+            errorMessage = "剪贴板中没有可用的 GRAIN 调色预设。"
+            return
+        }
+
+        withAnimation(.snappy(duration: 0.24)) {
+            selectedProfile = preset.profile
+            settings = preset.settings
+            intensity = preset.intensity
+        }
+        schedulePreview()
+        showNotice("已粘贴预设 · \(preset.profile.name)")
+#endif
     }
 
     func schedulePreview() {
@@ -209,5 +254,19 @@ final class EditorViewModel: ObservableObject {
         let prefix = cleanName.isEmpty ? "GRAIN" : cleanName
         let look = profile.shortName.lowercased()
         return "\(prefix)-\(look)-fullres"
+    }
+
+    private func showNotice(_ text: String) {
+        noticeTask?.cancel()
+        withAnimation(.easeOut(duration: 0.16)) {
+            noticeMessage = text
+        }
+        noticeTask = Task {
+            try? await Task.sleep(for: .seconds(1.8))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.18)) {
+                noticeMessage = nil
+            }
+        }
     }
 }

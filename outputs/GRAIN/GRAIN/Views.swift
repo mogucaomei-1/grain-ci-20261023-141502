@@ -1,8 +1,9 @@
+import Photos
 import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var editor: EditorViewModel
-    @State private var showImportSource = false
+    @StateObject private var photoLibrary = PhotoLibraryViewModel()
     @State private var showPhotoPicker = false
     @State private var showDocumentPicker = false
     @State private var showExportSheet = false
@@ -15,7 +16,8 @@ struct RootView: View {
                 MinimalTopBar(
                     hasPhoto: editor.photo != nil,
                     onBack: editor.returnHome,
-                    onImport: { showImportSource = true },
+                    onAlbum: requestPhotoLibrary,
+                    onFiles: { showDocumentPicker = true },
                     onExport: {
                         editor.exportResult = nil
                         showExportSheet = true
@@ -23,21 +25,13 @@ struct RootView: View {
                 )
 
                 if editor.photo == nil {
-                    EmptyImportView(
-                        onOpenPhotos: requestPhotoLibrary,
-                        onOpenFiles: { showDocumentPicker = true }
-                    )
+                    PhotoLibraryHome(library: photoLibrary) { asset in
+                        importLibraryAsset(asset)
+                    }
                 } else {
                     EditorWorkspace()
                 }
             }
-        }
-        .confirmationDialog("导入照片", isPresented: $showImportSource, titleVisibility: .visible) {
-            Button("从照片图库选择") { requestPhotoLibrary() }
-            Button("从文件选择 Sony RAW") { showDocumentPicker = true }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("照片图库会自动获取 iCloud 中的原始 RAW；若系统只返回 JPEG，可改用文件导入。")
         }
         .fullScreenCover(isPresented: $showPhotoPicker) {
             PhotosRawImporter { url in
@@ -74,6 +68,18 @@ struct RootView: View {
         } message: {
             Text(editor.errorMessage ?? "")
         }
+        .overlay(alignment: .top) {
+            if let notice = editor.noticeMessage {
+                Text(notice)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(GrainTheme.black)
+                    .padding(.horizontal, 13)
+                    .frame(height: 30)
+                    .background(GrainTheme.paper, in: Capsule())
+                    .padding(.top, 62)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
     }
 
     private func requestPhotoLibrary() {
@@ -85,12 +91,24 @@ struct RootView: View {
             }
         }
     }
+
+    private func importLibraryAsset(_ asset: PHAsset) {
+        Task {
+            do {
+                let url = try await photoLibrary.originalFileURL(for: asset)
+                editor.importPhoto(from: url)
+            } catch {
+                editor.errorMessage = error.localizedDescription
+            }
+        }
+    }
 }
 
 private struct MinimalTopBar: View {
     let hasPhoto: Bool
     let onBack: () -> Void
-    let onImport: () -> Void
+    let onAlbum: () -> Void
+    let onFiles: () -> Void
     let onExport: () -> Void
 
     var body: some View {
@@ -107,40 +125,32 @@ private struct MinimalTopBar: View {
                     .foregroundStyle(GrainTheme.paper)
                 }
 
-                ZStack {
-                    Circle().fill(GrainTheme.paper)
-                    Circle()
-                        .trim(from: 0.05, to: 0.52)
-                        .stroke(GrainTheme.black, style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
-                        .rotationEffect(.degrees(-34))
-                        .padding(6)
-                    Circle()
-                        .fill(GrainTheme.accent)
-                        .frame(width: 5, height: 5)
-                        .offset(x: 6, y: -5)
-                }
-                .frame(width: 29, height: 29)
+                AnimatedCameraMark(size: 29)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("GRAIN")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .tracking(2.1)
-                    Text("RAW FILM LAB  1.1")
-                        .font(.system(size: 6.5, weight: .semibold, design: .monospaced))
-                        .tracking(1.3)
-                        .foregroundStyle(GrainTheme.muted)
-                }
+                Text("GRAIN")
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .tracking(2.3)
             }
 
             Spacer()
 
-            Button(action: onImport) {
-                Image(systemName: "photo.badge.plus")
+            Button(action: onAlbum) {
+                Image(systemName: "photo.on.rectangle.angled")
                     .font(.system(size: 14, weight: .medium))
                     .frame(width: 38, height: 38)
                     .background(GrainTheme.raised, in: Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("从相册选择")
+
+            Button(action: onFiles) {
+                Image(systemName: "folder")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 38, height: 38)
+                    .background(GrainTheme.raised, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("从文件导入")
 
             Button(action: onExport) {
                 Image(systemName: "arrow.up")
@@ -155,82 +165,6 @@ private struct MinimalTopBar: View {
         .foregroundStyle(GrainTheme.paper)
         .padding(.horizontal, 18)
         .frame(height: 54)
-    }
-}
-
-private struct EmptyImportView: View {
-    let onOpenPhotos: () -> Void
-    let onOpenFiles: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            ZStack {
-                Circle()
-                    .fill(GrainTheme.surface)
-                    .frame(width: 116, height: 116)
-                Circle()
-                    .stroke(GrainTheme.line, lineWidth: 1)
-                    .frame(width: 116, height: 116)
-                Image(systemName: "camera.aperture")
-                    .font(.system(size: 35, weight: .light))
-                    .foregroundStyle(GrainTheme.paper)
-            }
-            .padding(.bottom, 24)
-
-            Text("打开原始照片")
-                .font(.system(size: 27, weight: .bold, design: .serif))
-                .foregroundStyle(GrainTheme.paper)
-                .padding(.bottom, 7)
-
-            Text("从“文件”选择 Sony ARW，保留完整 RAW 与元数据")
-                .font(.system(size: 11, weight: .regular, design: .rounded))
-                .foregroundStyle(GrainTheme.muted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 36)
-
-            Button(action: onOpenPhotos) {
-                HStack(spacing: 9) {
-                    Image(systemName: "photo.on.rectangle")
-                    Text("从照片图库选择")
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                        .foregroundStyle(GrainTheme.black.opacity(0.45))
-                }
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(GrainTheme.black)
-                .padding(.horizontal, 17)
-                .frame(height: 52)
-                .background(GrainTheme.paper, in: RoundedRectangle(cornerRadius: 16))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 34)
-            .padding(.top, 32)
-
-            Button(action: onOpenFiles) {
-                HStack(spacing: 8) {
-                    Image(systemName: "folder")
-                    Text("从文件导入 RAW")
-                }
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(GrainTheme.paper)
-                .padding(.horizontal, 16)
-                .frame(height: 42)
-                .background(GrainTheme.raised, in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 12)
-
-            Spacer()
-
-            Text("ARW  ·  SRF  ·  SR2  ·  DNG")
-                .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                .tracking(1.8)
-                .foregroundStyle(GrainTheme.muted.opacity(0.55))
-                .padding(.bottom, 24)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -487,6 +421,33 @@ private struct FilmPresetBar: View {
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(GrainTheme.paper)
                 Spacer()
+
+                Button {
+                    editor.copyPreset()
+                } label: {
+                    Label("复制", systemImage: "doc.on.doc")
+                        .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(GrainTheme.muted)
+                        .padding(.horizontal, 7)
+                        .frame(height: 24)
+                        .background(GrainTheme.raised, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("复制调色预设")
+
+                Button {
+                    editor.pastePreset()
+                } label: {
+                    Label("粘贴", systemImage: "doc.on.clipboard")
+                        .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(GrainTheme.muted)
+                        .padding(.horizontal, 7)
+                        .frame(height: 24)
+                        .background(GrainTheme.raised, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("粘贴调色预设")
+
                 Button {
                     editor.recommendLook()
                 } label: {
@@ -496,7 +457,7 @@ private struct FilmPresetBar: View {
                                 .controlSize(.mini)
                                 .tint(GrainTheme.accent)
                         } else {
-                            Image(systemName: "sparkles")
+                            Image(systemName: "wand.and.stars")
                         }
                         Text("推荐")
                     }

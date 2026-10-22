@@ -206,7 +206,7 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 }
 
-struct FilmSettings: Equatable, Sendable {
+struct FilmSettings: Equatable, Codable, Sendable {
     var exposure: Double
     var temperature: Double
     var tint: Double
@@ -222,6 +222,20 @@ struct FilmSettings: Equatable, Sendable {
     var grain: Double
     var vignette: Double
     var sharpness: Double
+}
+
+struct PresetClipboard: Codable, Sendable {
+    let version: Int
+    let profile: FilmProfile
+    let settings: FilmSettings
+    let intensity: Double
+
+    init(profile: FilmProfile, settings: FilmSettings, intensity: Double) {
+        version = 1
+        self.profile = profile
+        self.settings = settings
+        self.intensity = intensity
+    }
 }
 
 enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
