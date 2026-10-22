@@ -9,6 +9,7 @@ struct GRAINApp: App {
             RootView()
                 .environmentObject(editor)
                 .preferredColorScheme(.dark)
+                .onAppear(perform: GrainHaptics.prepare)
         }
     }
 }

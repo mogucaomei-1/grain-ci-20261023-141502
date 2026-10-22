@@ -9,6 +9,7 @@ struct RootView: View {
     @State private var showDocumentPicker = false
     @State private var showExportSheet = false
     @State private var showInfoSheet = false
+    @State private var showSettings = false
 
     var body: some View {
         ZStack {
@@ -20,6 +21,7 @@ struct RootView: View {
                         hasPhoto: false,
                         onFiles: { showDocumentPicker = true },
                         onInfo: { showInfoSheet = true },
+                        onSettings: { showSettings = true },
                         histogramVisible: showHistogram,
                         onToggleHistogram: {
                             showHistogram.toggle()
@@ -40,6 +42,7 @@ struct RootView: View {
                             hasPhoto: true,
                             onFiles: { showDocumentPicker = true },
                             onInfo: { showInfoSheet = true },
+                            onSettings: { showSettings = true },
                             histogramVisible: showHistogram,
                             onToggleHistogram: {
                                 showHistogram.toggle()
@@ -50,7 +53,13 @@ struct RootView: View {
                             }
                         )
 
-                        EditorWorkspace(showHistogram: showHistogram)
+                        EditorWorkspace(
+                            showHistogram: showHistogram,
+                            onBackToLibrary: {
+                                editor.returnHome()
+                                Task { await photoLibrary.refresh() }
+                            }
+                        )
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(GrainTheme.black.ignoresSafeArea())
@@ -77,6 +86,11 @@ struct RootView: View {
             ImageInfoSheet()
                 .environmentObject(editor)
                 .presentationDetents([.height(520)])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showSettings) {
+            AppSettingsView()
+                .presentationDetents([.height(290)])
                 .presentationDragIndicator(.visible)
         }
         .alert(
@@ -158,6 +172,7 @@ private struct MinimalTopBar: View {
     let hasPhoto: Bool
     let onFiles: () -> Void
     let onInfo: () -> Void
+    let onSettings: () -> Void
     let histogramVisible: Bool
     let onToggleHistogram: () -> Void
     let onExport: () -> Void
@@ -165,7 +180,13 @@ private struct MinimalTopBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 9) {
-                AnimatedCameraMark(size: 29)
+                Button(action: onSettings) {
+                    AnimatedCameraMark(size: 29)
+                        .frame(width: 38, height: 38)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("打开设置")
 
                 Text("GRAIN")
                     .font(.system(size: 14, weight: .heavy, design: .rounded))
@@ -224,11 +245,14 @@ private struct MinimalTopBar: View {
 
 private struct EditorWorkspace: View {
     @EnvironmentObject private var editor: EditorViewModel
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     let showHistogram: Bool
+    let onBackToLibrary: () -> Void
     @State private var showCropEditor = false
     @State private var editingTextID: UUID?
     @State private var selectedTextID: UUID?
     @State private var showTextEditor = false
+    @State private var didSwipeBack = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -268,6 +292,25 @@ private struct EditorWorkspace: View {
                     .presentationDragIndicator(.visible)
             }
         }
+        .simultaneousGesture(edgeSwipeGesture)
+    }
+
+    private var edgeSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+            .onChanged { value in
+                guard !didSwipeBack,
+                      value.startLocation.x <= 34,
+                      value.translation.width > 64,
+                      value.translation.width > abs(value.translation.height) * 1.35
+                else { return }
+
+                didSwipeBack = true
+                GrainHaptics.mediumImpact(enabled: hapticsEnabled)
+                onBackToLibrary()
+            }
+            .onEnded { _ in
+                didSwipeBack = false
+            }
     }
 }
 
@@ -421,6 +464,7 @@ private struct PhotoEditorCanvas: View {
 }
 
 private struct EditableTextOverlayView: View {
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     let overlay: PhotoTextOverlay
     let selected: Bool
     let canvasSize: CGSize
@@ -430,68 +474,78 @@ private struct EditableTextOverlayView: View {
     let onMoveStart: () -> Void
     let onMove: (CGPoint) -> Void
     @State private var dragOrigin: CGPoint?
+    @State private var liveCenter: CGPoint?
+    @State private var lastSnapKey: String?
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Text(overlay.text.isEmpty ? " " : overlay.text)
-                .font(
-                    overlay.font.swiftUIFont(
-                        size: max(10, min(canvasSize.width, canvasSize.height) * overlay.fontSize)
-                    )
+        Text(overlay.text.isEmpty ? " " : overlay.text)
+            .font(
+                overlay.font.swiftUIFont(
+                    size: max(10, min(canvasSize.width, canvasSize.height) * overlay.fontSize)
                 )
-                .foregroundStyle(
-                    Color(
-                        red: overlay.red,
-                        green: overlay.green,
-                        blue: overlay.blue,
-                        opacity: overlay.alpha
-                    )
+            )
+            .foregroundStyle(
+                Color(
+                    red: overlay.red,
+                    green: overlay.green,
+                    blue: overlay.blue,
+                    opacity: overlay.alpha
                 )
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
-                .padding(9)
-                .overlay {
-                    if selected {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .stroke(GrainTheme.paper.opacity(0.9), lineWidth: 0.9)
-                            .allowsHitTesting(false)
-                    }
+            )
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
+            .padding(9)
+            .overlay {
+                if selected {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(GrainTheme.paper.opacity(0.9), lineWidth: 0.9)
+                        .allowsHitTesting(false)
                 }
-                .contentShape(Rectangle())
-                .gesture(textDragGesture)
-                .onTapGesture {
-                    if selected {
-                        onEdit()
-                    } else {
-                        onSelect()
-                    }
-                }
-
-            if selected {
-                Button(action: onDelete) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(Color(hex: 0xB64532), in: Circle())
-                        .overlay {
-                            Circle().stroke(Color.white.opacity(0.75), lineWidth: 0.7)
-                        }
-                }
-                .buttonStyle(.plain)
-                .offset(x: 11, y: -11)
-                .accessibilityLabel("删除文字")
-                .zIndex(3)
             }
-        }
-        .padding(14)
-        .contentShape(Rectangle())
+            .overlay(alignment: .topTrailing) {
+                if selected {
+                    Button {
+                        GrainHaptics.lightImpact(enabled: hapticsEnabled)
+                        onDelete()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 22, height: 22)
+                            .background(Color(hex: 0xB64532), in: Circle())
+                            .overlay {
+                                Circle().stroke(Color.white.opacity(0.75), lineWidth: 0.7)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: 11, y: -11)
+                    .zIndex(2)
+                    .accessibilityLabel("删除文字")
+                }
+            }
+            .padding(14)
+            .contentShape(Rectangle())
+            .gesture(textDragGesture)
+            .onTapGesture {
+                if selected {
+                    onEdit()
+                } else {
+                    onSelect()
+                }
+            }
         .position(
+            x: displayedCenter.x,
+            y: displayedCenter.y
+        )
+        .zIndex(selected ? 2 : 1)
+    }
+
+    private var displayedCenter: CGPoint {
+        liveCenter ?? CGPoint(
             x: overlay.x * canvasSize.width,
             y: overlay.y * canvasSize.height
         )
-        .zIndex(selected ? 2 : 1)
     }
 
     private var textDragGesture: some Gesture {
@@ -505,16 +559,61 @@ private struct EditableTextOverlayView: View {
                     onMoveStart()
                 }
                 guard let origin = dragOrigin else { return }
-                onMove(
-                    CGPoint(
-                        x: origin.x + value.translation.width,
-                        y: origin.y + value.translation.height
-                    )
+                let rawPoint = CGPoint(
+                    x: origin.x + value.translation.width,
+                    y: origin.y + value.translation.height
                 )
+                let snapped = snappedPoint(rawPoint)
+                liveCenter = snapped.point
+                if snapped.key != lastSnapKey {
+                    lastSnapKey = snapped.key
+                    if snapped.key != nil {
+                        GrainHaptics.selection(enabled: hapticsEnabled)
+                    }
+                }
             }
             .onEnded { _ in
+                if let liveCenter {
+                    onMove(liveCenter)
+                }
                 dragOrigin = nil
+                liveCenter = nil
+                lastSnapKey = nil
             }
+    }
+
+    private func snappedPoint(_ point: CGPoint) -> (point: CGPoint, key: String?) {
+        let snapDistance: CGFloat = 20
+        let anchors: [CGFloat] = [0.15, 0.50, 0.85]
+        var snappedX = point.x
+        var snappedY = point.y
+        var xKey: Int?
+        var yKey: Int?
+
+        for (index, anchor) in anchors.enumerated() {
+            let targetX = anchor * canvasSize.width
+            if abs(point.x - targetX) <= snapDistance {
+                snappedX = targetX
+                xKey = index
+                break
+            }
+        }
+        for (index, anchor) in anchors.enumerated() {
+            let targetY = anchor * canvasSize.height
+            if abs(point.y - targetY) <= snapDistance {
+                snappedY = targetY
+                yKey = index
+                break
+            }
+        }
+
+        let key: String?
+        if xKey != nil || yKey != nil {
+            key = "\(xKey ?? -1)-\(yKey ?? -1)"
+        } else {
+            key = nil
+        }
+        return (CGPoint(x: snappedX, y: snappedY), key)
     }
 }
 
@@ -943,10 +1042,12 @@ private enum AdjustTool: String, CaseIterable, Identifiable {
 
 private struct AdjustPanel: View {
     @EnvironmentObject private var editor: EditorViewModel
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     let onCrop: () -> Void
     let onAddText: () -> Void
     @State private var selectedCategory: AdjustCategory = .light
     @State private var selectedTool: AdjustTool = .exposure
+    @State private var lastHapticValue = Double.nan
 
     var body: some View {
         VStack(spacing: 7) {
@@ -956,6 +1057,7 @@ private struct AdjustPanel: View {
                         withAnimation(.easeOut(duration: 0.16)) {
                             selectedCategory = category
                             selectedTool = tools(for: category).first ?? .exposure
+                            lastHapticValue = value(for: selectedTool)
                         }
                     } label: {
                         VStack(spacing: 4) {
@@ -1000,6 +1102,7 @@ private struct AdjustPanel: View {
                     ForEach(tools(for: selectedCategory)) { tool in
                         Button {
                             selectedTool = tool
+                            lastHapticValue = value(for: tool)
                         } label: {
                             Text(tool.title)
                                 .font(.system(size: 9.5, weight: .semibold, design: .rounded))
@@ -1025,6 +1128,8 @@ private struct AdjustPanel: View {
                     onEditingChanged: { editing in
                         if editing {
                             editor.recordUndoSnapshot()
+                            lastHapticValue = value(for: selectedTool)
+                            GrainHaptics.prepare()
                         }
                     }
                 )
@@ -1062,6 +1167,7 @@ private struct AdjustPanel: View {
             set: {
                 setValue($0, for: selectedTool)
                 editor.markManualAdjustment()
+                emitSliderHaptic(for: $0)
                 editor.schedulePreview()
             }
         )
@@ -1124,6 +1230,19 @@ private struct AdjustPanel: View {
         case .grain: editor.settings.grain = value
         case .vignette: editor.settings.vignette = value
         }
+    }
+
+    private func emitSliderHaptic(for value: Double) {
+        let step: Double
+        switch selectedTool {
+        case .exposure: step = 0.05
+        case .temperature: step = 50
+        case .intensity, .fade, .grain, .vignette, .sharpness: step = 2
+        default: step = 5
+        }
+        guard !lastHapticValue.isNaN, abs(value - lastHapticValue) >= step else { return }
+        lastHapticValue = value
+        GrainHaptics.selection(enabled: hapticsEnabled)
     }
 }
 

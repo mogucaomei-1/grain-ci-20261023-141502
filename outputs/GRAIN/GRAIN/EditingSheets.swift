@@ -264,3 +264,65 @@ struct ImageInfoSheet: View {
         return String(format: "%.6f, %.6f", latitude, longitude)
     }
 }
+
+struct AppSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
+
+    var body: some View {
+        ZStack {
+            GrainTheme.black.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("设置")
+                            .font(.system(size: 26, weight: .bold, design: .serif))
+                        Text("GRAIN 1.1 · \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(GrainTheme.muted)
+                    }
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 31, height: 31)
+                            .background(GrainTheme.raised, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(GrainTheme.accent)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("震动反馈")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        Text("用于参数滑动、文字吸附和返回手势")
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundStyle(GrainTheme.muted)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $hapticsEnabled)
+                        .labelsHidden()
+                        .tint(GrainTheme.accent)
+                        .onChange(of: hapticsEnabled) { _, enabled in
+                            if enabled {
+                                GrainHaptics.lightImpact(enabled: true)
+                            }
+                        }
+                }
+                .padding(16)
+                .background(GrainTheme.surface, in: RoundedRectangle(cornerRadius: 17))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 17)
+                        .stroke(GrainTheme.line, lineWidth: 0.8)
+                }
+
+                Spacer()
+            }
+            .padding(20)
+        }
+    }
+}
