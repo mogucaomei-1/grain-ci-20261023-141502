@@ -10,6 +10,8 @@ struct RootView: View {
     @State private var showExportSheet = false
     @State private var showInfoSheet = false
     @State private var showSettings = false
+    @State private var libraryImportTask: Task<Void, Never>?
+    @State private var libraryImportGeneration = 0
 
     var body: some View {
         ZStack {
@@ -56,6 +58,7 @@ struct RootView: View {
                         EditorWorkspace(
                             showHistogram: showHistogram,
                             onBackToLibrary: {
+                                cancelPendingLibraryImport()
                                 editor.returnHome()
                                 Task { await photoLibrary.refresh() }
                             }
@@ -147,6 +150,7 @@ struct RootView: View {
             get: { editor.photo != nil },
             set: { presented in
                 if !presented {
+                    cancelPendingLibraryImport()
                     editor.returnHome()
                     Task {
                         await photoLibrary.refresh()
@@ -157,14 +161,35 @@ struct RootView: View {
     }
 
     private func importLibraryAsset(_ asset: PHAsset) {
-        Task {
+        cancelPendingLibraryImport()
+        libraryImportGeneration += 1
+        let generation = libraryImportGeneration
+
+        libraryImportTask = Task {
             do {
                 let url = try await photoLibrary.originalFileURL(for: asset)
+                try Task.checkCancellation()
+                guard generation == libraryImportGeneration else {
+                    try? FileManager.default.removeItem(at: url)
+                    return
+                }
                 editor.importPhoto(from: url)
+                libraryImportTask = nil
+            } catch is CancellationError {
+                guard generation == libraryImportGeneration else { return }
+                libraryImportTask = nil
             } catch {
+                guard generation == libraryImportGeneration else { return }
                 editor.errorMessage = error.localizedDescription
+                libraryImportTask = nil
             }
         }
+    }
+
+    private func cancelPendingLibraryImport() {
+        libraryImportGeneration += 1
+        libraryImportTask?.cancel()
+        libraryImportTask = nil
     }
 }
 
@@ -474,8 +499,11 @@ private struct EditableTextOverlayView: View {
     let onMoveStart: () -> Void
     let onMove: (CGPoint) -> Void
     @State private var dragOrigin: CGPoint?
-    @State private var liveCenter: CGPoint?
+    @State private var pendingCenter: CGPoint?
+    @State private var dragOffset = CGSize.zero
+    @State private var isDragging = false
     @State private var lastSnapKey: String?
+    @State private var lastDragHapticDistance: CGFloat = 0
 
     var body: some View {
         Text(overlay.text.isEmpty ? " " : overlay.text)
@@ -494,7 +522,11 @@ private struct EditableTextOverlayView: View {
             )
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
-            .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
+            .shadow(
+                color: isDragging ? .clear : .black.opacity(0.22),
+                radius: isDragging ? 0 : 2,
+                y: isDragging ? 0 : 1
+            )
             .padding(9)
             .overlay {
                 if selected {
@@ -534,18 +566,16 @@ private struct EditableTextOverlayView: View {
                     onSelect()
                 }
             }
-        .position(
-            x: displayedCenter.x,
-            y: displayedCenter.y
-        )
-        .zIndex(selected ? 2 : 1)
-    }
-
-    private var displayedCenter: CGPoint {
-        liveCenter ?? CGPoint(
-            x: overlay.x * canvasSize.width,
-            y: overlay.y * canvasSize.height
-        )
+            .compositingGroup()
+            .position(
+                x: overlay.x * canvasSize.width,
+                y: overlay.y * canvasSize.height
+            )
+            .offset(dragOffset)
+            .transaction { transaction in
+                transaction.animation = nil
+            }
+            .zIndex(selected ? 2 : 1)
     }
 
     private var textDragGesture: some Gesture {
@@ -556,6 +586,8 @@ private struct EditableTextOverlayView: View {
                         x: overlay.x * canvasSize.width,
                         y: overlay.y * canvasSize.height
                     )
+                    lastDragHapticDistance = 0
+                    isDragging = true
                     onMoveStart()
                 }
                 guard let origin = dragOrigin else { return }
@@ -564,25 +596,44 @@ private struct EditableTextOverlayView: View {
                     y: origin.y + value.translation.height
                 )
                 let snapped = snappedPoint(rawPoint)
-                liveCenter = snapped.point
+                pendingCenter = snapped.point
+                dragOffset = CGSize(
+                    width: snapped.point.x - origin.x,
+                    height: snapped.point.y - origin.y
+                )
+
+                let travel = hypot(value.translation.width, value.translation.height)
+                let gridKey = snapped.gridKey
+                let enteredGridPoint = gridKey != nil && gridKey != lastSnapKey
                 if snapped.key != lastSnapKey {
                     lastSnapKey = snapped.key
-                    if snapped.key != nil {
-                        GrainHaptics.selection(enabled: hapticsEnabled)
+                    if enteredGridPoint {
+                        lastDragHapticDistance = travel
+                        GrainHaptics.lightImpact(enabled: hapticsEnabled)
                     }
+                }
+                if !enteredGridPoint,
+                   travel - lastDragHapticDistance >= 18 {
+                    lastDragHapticDistance = travel
+                    GrainHaptics.selection(enabled: hapticsEnabled)
                 }
             }
             .onEnded { _ in
-                if let liveCenter {
-                    onMove(liveCenter)
+                withTransaction(Transaction(animation: nil)) {
+                    if let pendingCenter {
+                        onMove(pendingCenter)
+                    }
+                    dragOrigin = nil
+                    pendingCenter = nil
+                    dragOffset = .zero
+                    isDragging = false
+                    lastSnapKey = nil
+                    lastDragHapticDistance = 0
                 }
-                dragOrigin = nil
-                liveCenter = nil
-                lastSnapKey = nil
             }
     }
 
-    private func snappedPoint(_ point: CGPoint) -> (point: CGPoint, key: String?) {
+    private func snappedPoint(_ point: CGPoint) -> (point: CGPoint, key: String?, gridKey: String?) {
         let snapDistance: CGFloat = 20
         let anchors: [CGFloat] = [0.15, 0.50, 0.85]
         var snappedX = point.x
@@ -608,12 +659,18 @@ private struct EditableTextOverlayView: View {
         }
 
         let key: String?
-        if xKey != nil || yKey != nil {
+        let gridKey: String?
+        if let xKey, let yKey {
+            key = "\(xKey)-\(yKey)"
+            gridKey = key
+        } else if xKey != nil || yKey != nil {
             key = "\(xKey ?? -1)-\(yKey ?? -1)"
+            gridKey = nil
         } else {
             key = nil
+            gridKey = nil
         }
-        return (CGPoint(x: snappedX, y: snappedY), key)
+        return (CGPoint(x: snappedX, y: snappedY), key, gridKey)
     }
 }
 

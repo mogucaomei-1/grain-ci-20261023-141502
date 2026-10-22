@@ -52,10 +52,25 @@ final class PhotoLibraryViewModel: NSObject, ObservableObject, PHPhotoLibraryCha
     }
 
     func originalFileURL(for asset: PHAsset) async throws -> URL {
+        originalRequestGeneration += 1
+        let generation = originalRequestGeneration
         isDownloadingOriginal = true
-        defer { isDownloadingOriginal = false }
-        return try await PhotoLibraryAssetLoader.loadOriginal(asset: asset)
+        defer {
+            if generation == originalRequestGeneration {
+                isDownloadingOriginal = false
+            }
+        }
+
+        let url = try await PhotoLibraryAssetLoader.loadOriginal(asset: asset)
+        try Task.checkCancellation()
+        guard generation == originalRequestGeneration else {
+            try? FileManager.default.removeItem(at: url)
+            throw CancellationError()
+        }
+        return url
     }
+
+    private var originalRequestGeneration = 0
 }
 
 private enum PhotoLibraryAssetLoader {
@@ -145,6 +160,7 @@ struct PhotoLibraryHome: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                             }
                             .buttonStyle(.plain)
+                            .disabled(library.isDownloadingOriginal)
                         }
                     }
                     .padding(.horizontal, 3)
