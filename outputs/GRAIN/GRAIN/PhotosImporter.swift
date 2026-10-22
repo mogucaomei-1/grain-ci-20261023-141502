@@ -85,8 +85,8 @@ struct PhotosRawImporter: UIViewControllerRepresentable {
             }
 
             if let assetIdentifier = results.first?.assetIdentifier {
-                loadOriginalAsset(assetIdentifier: assetIdentifier) {
-                    loadItemProvider(provider)
+                loadOriginalAsset(assetIdentifier: assetIdentifier) { [weak self] in
+                    self?.loadItemProvider(provider)
                 }
                 return
             }
