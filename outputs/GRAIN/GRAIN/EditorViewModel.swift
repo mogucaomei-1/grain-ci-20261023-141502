@@ -8,6 +8,7 @@ final class EditorViewModel: ObservableObject {
     @Published private(set) var originalPreview: CGImage?
     @Published private(set) var editedPreview: CGImage?
     @Published private(set) var isPreparing = false
+    @Published private(set) var isRecommending = false
     @Published private(set) var isExporting = false
     @Published var selectedProfile: FilmProfile = .portra
     @Published var settings: FilmSettings = FilmProfile.portra.factorySettings
@@ -49,6 +50,27 @@ final class EditorViewModel: ObservableObject {
             intensity = selectedProfile == .neutral ? 1 : 0.82
         }
         schedulePreview()
+    }
+
+    func recommendLook() {
+        guard let originalPreview, !isRecommending else { return }
+        isRecommending = true
+
+        Task {
+            let recommendation = await Task.detached(priority: .userInitiated) {
+                LocalLookAdvisor.recommend(from: originalPreview)
+            }.value
+
+            withAnimation(.snappy(duration: 0.24)) {
+                selectedProfile = recommendation.profile
+                settings = recommendation.profile.factorySettings
+                settings.exposure += recommendation.exposureDelta
+                settings.temperature += recommendation.temperatureDelta
+                intensity = 0.82
+            }
+            schedulePreview()
+            isRecommending = false
+        }
     }
 
     func schedulePreview() {

@@ -46,7 +46,9 @@
     .section-head{height:20px;padding:0 18px;display:flex;align-items:center;gap:8px}
     .section-head b{font:800 8px/1 ui-monospace,Menlo,monospace;letter-spacing:1.5px;color:var(--muted)}
     .section-head span{font-size:10px;font-weight:650}
-    .section-head button{margin-left:auto;border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer}
+    .film-actions{margin-left:auto;display:flex;align-items:center;gap:5px}
+    .film-actions button{border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer}
+    .film-actions .recommend{height:24px;padding:0 9px;border-radius:999px;background:rgba(217,119,78,.1);color:var(--accent);font-size:9px;font-weight:650}
     .films{display:flex;gap:5px;overflow-x:auto;padding:6px 16px 0;scrollbar-width:none}
     .films::-webkit-scrollbar{display:none}
     .film{flex:0 0 auto;border:0;background:transparent;padding:4px;border-radius:13px;width:80px;cursor:pointer}
@@ -118,9 +120,9 @@
         </section>
 
         <section class="filmbar">
-          <div class="section-head"><b>胶片</b><span id="filmName">柯达 波特拉 400</span><button id="reset">↺</button></div>
+          <div class="section-head"><b>胶片</b><span id="filmName">柯达 波特拉 400</span><div class="film-actions"><button class="recommend" id="recommend">✦ 推荐</button><button id="reset">↺</button></div></div>
           <div class="films" id="films">
-            <button class="film" data-profile="neutral"><span class="swatch" style="background:linear-gradient(135deg,#8b8d8a,#b7b3a9,#dfd8cb)">原片</span><span class="name">原片中性</span></button>
+            <button class="film" data-profile="neutral"><span class="swatch" style="background:linear-gradient(135deg,#8b8d8a,#b7b3a9,#dfd8cb)">原图</span><span class="name">原图</span></button>
             <button class="film active" data-profile="portra"><span class="swatch" style="background:linear-gradient(135deg,#b86f58,#d6aa86,#eadcc7)">波特拉</span><span class="name">柯达 波特拉 400</span></button>
             <button class="film" data-profile="film135t"><span class="swatch" style="background:linear-gradient(135deg,#254b66,#4f8a86,#d8c0a2)">135T</span><span class="name">135T 街拍</span></button>
             <button class="film" data-profile="portra160"><span class="swatch" style="background:linear-gradient(135deg,#b77a66,#d9b08f,#eee0cc)">P160</span><span class="name">柯达 波特拉 160</span></button>
@@ -184,7 +186,7 @@
 
   <script>
     const profiles={
-      neutral:{name:'原片中性',badge:'原片',filter:'none'},
+      neutral:{name:'原图',badge:'原图',filter:'none'},
       portra:{name:'柯达 波特拉 400',badge:'波特拉',filter:'saturate(.88) contrast(.94) sepia(.08) brightness(1.035)'},
       film135t:{name:'135T 街拍',badge:'135T',filter:'saturate(.93) contrast(1.15) brightness(.99) hue-rotate(-3deg)'},
       portra160:{name:'柯达 波特拉 160',badge:'P160',filter:'saturate(.94) contrast(.92) sepia(.06) brightness(1.04)'},
@@ -265,6 +267,7 @@
     $('#slider').oninput=()=>{setFill($('#slider'));updateValue();sliders[activeTool][2]=+$('#slider').value;applyAdjustments();photo.classList.add('loading');setTimeout(()=>photo.classList.remove('loading'),100)};
     $('#holdOriginal').addEventListener('pointerdown',()=>{photo.classList.add('holding')});
     ['pointerup','pointercancel','pointerleave'].forEach(e=>$('#holdOriginal').addEventListener(e,()=>photo.classList.remove('holding')));
+    $('#recommend').onclick=()=>{$('#recommend').textContent='分析中';photo.classList.add('loading');setTimeout(()=>{choose('film135t');$('#recommend').textContent='✦ 推荐';photo.classList.remove('loading')},650)};
     $('#reset').onclick=()=>choose(activeProfile);
     $('#backHome').onclick=()=>{$('#fileInput').value='';document.querySelector('.workspace').style.opacity='.18';setTimeout(()=>document.querySelector('.workspace').style.opacity='1',350)};
     $('#openExport').onclick=()=>$('#phone').classList.add('sheet-open');

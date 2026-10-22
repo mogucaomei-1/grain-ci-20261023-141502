@@ -24,7 +24,7 @@ struct RootView: View {
 
                 if editor.photo == nil {
                     EmptyImportView(
-                        onOpenPhotos: { showPhotoPicker = true },
+                        onOpenPhotos: requestPhotoLibrary,
                         onOpenFiles: { showDocumentPicker = true }
                     )
                 } else {
@@ -33,11 +33,11 @@ struct RootView: View {
             }
         }
         .confirmationDialog("导入照片", isPresented: $showImportSource, titleVisibility: .visible) {
-            Button("从照片图库选择") { showPhotoPicker = true }
+            Button("从照片图库选择") { requestPhotoLibrary() }
             Button("从文件选择 Sony RAW") { showDocumentPicker = true }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("需要原始 ARW 请优先从“文件”导入，以避免照片图库返回 JPEG 副本。")
+            Text("照片图库会自动获取 iCloud 中的原始 RAW；若系统只返回 JPEG，可改用文件导入。")
         }
         .fullScreenCover(isPresented: $showPhotoPicker) {
             PhotosRawImporter { url in
@@ -76,6 +76,15 @@ struct RootView: View {
         }
     }
 
+    private func requestPhotoLibrary() {
+        Task {
+            if await PhotoLibraryAccess.request() {
+                showPhotoPicker = true
+            } else {
+                editor.errorMessage = "照片读取权限未开启。请前往“设置 → GRAIN → 照片”允许读取，才能从 iCloud 下载原始 RAW。"
+            }
+        }
+    }
 }
 
 private struct MinimalTopBar: View {
@@ -355,6 +364,28 @@ private struct FilmPresetBar: View {
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(GrainTheme.paper)
                 Spacer()
+                Button {
+                    editor.recommendLook()
+                } label: {
+                    HStack(spacing: 4) {
+                        if editor.isRecommending {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .tint(GrainTheme.accent)
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
+                        Text("推荐")
+                    }
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(GrainTheme.accent)
+                    .padding(.horizontal, 9)
+                    .frame(height: 24)
+                    .background(GrainTheme.accent.opacity(0.10), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(editor.isRecommending)
+
                 Button {
                     editor.resetSelectedProfile()
                 } label: {

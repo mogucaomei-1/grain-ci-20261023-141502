@@ -1,4 +1,5 @@
 import Foundation
+import Photos
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -83,6 +84,62 @@ struct PhotosRawImporter: UIViewControllerRepresentable {
                 return
             }
 
+            if let assetIdentifier = results.first?.assetIdentifier {
+                loadOriginalAsset(assetIdentifier: assetIdentifier) {
+                    loadItemProvider(provider)
+                }
+                return
+            }
+
+            loadItemProvider(provider)
+        }
+
+        private func loadOriginalAsset(assetIdentifier: String, fallback: @escaping () -> Void) {
+            let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil)
+            guard let asset = assets.firstObject else {
+                fallback()
+                return
+            }
+
+            let rawMarkers = ["arw", "srf", "sr2", "dng", "camera-raw"]
+            let resources = PHAssetResource.assetResources(for: asset)
+            let rawResource = resources.first { resource in
+                let identifier = resource.uniformTypeIdentifier.lowercased()
+                let filename = resource.originalFilename.lowercased()
+                return rawMarkers.contains { identifier.contains($0) || filename.hasSuffix(".\($0)") }
+            }
+
+            guard let rawResource else {
+                fallback()
+                return
+            }
+
+            let destination = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension(
+                    (rawResource.originalFilename as NSString).pathExtension.isEmpty
+                        ? "arw"
+                        : (rawResource.originalFilename as NSString).pathExtension
+                )
+            let options = PHAssetResourceRequestOptions()
+            options.isNetworkAccessAllowed = true
+
+            PHAssetResourceManager.default().writeData(
+                for: rawResource,
+                toFile: destination,
+                options: options
+            ) { [parent] error in
+                guard error == nil else {
+                    fallback()
+                    return
+                }
+                DispatchQueue.main.async {
+                    parent.onImport(destination)
+                }
+            }
+        }
+
+        private func loadItemProvider(_ provider: NSItemProvider) {
             let rawMarkers = ["arw", "srf", "sr2", "dng", "camera-raw"]
             let typeIdentifier = provider.registeredTypeIdentifiers.first { identifier in
                 let lowercased = identifier.lowercased()
@@ -123,6 +180,25 @@ struct PhotosRawImporter: UIViewControllerRepresentable {
                     }
                 }
             }
+        }
+    }
+}
+
+enum PhotoLibraryAccess {
+    static func request() async -> Bool {
+        switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
+        case .authorized, .limited:
+            return true
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+                    continuation.resume(returning: status == .authorized || status == .limited)
+                }
+            }
+        case .denied, .restricted:
+            return false
+        @unknown default:
+            return false
         }
     }
 }

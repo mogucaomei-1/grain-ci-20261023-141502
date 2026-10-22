@@ -25,7 +25,7 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var name: String {
         switch self {
-        case .neutral: "原片中性"
+        case .neutral: "原图"
         case .portra: "柯达 波特拉 400"
         case .film135t: "135T 街拍"
         case .portra160: "柯达 波特拉 160"
@@ -47,7 +47,7 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var shortName: String {
         switch self {
-        case .neutral: "原片"
+        case .neutral: "原图"
         case .portra: "波特拉"
         case .film135t: "135T"
         case .portra160: "P160"
@@ -69,7 +69,7 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var descriptor: String {
         switch self {
-        case .neutral: "忠实还原传感器色彩"
+        case .neutral: "不套用胶片色彩，保留 RAW 基础显影"
         case .portra: "奶油高光 · 柔和肤色"
         case .film135t: "深蓝天空 · 冷青阴影 · 高密度黑位"
         case .portra160: "低饱和肤色 · 细腻层次"
@@ -121,7 +121,7 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
             .init(exposure: 0, temperature: 6500, tint: 0,
                   highlights: 0, shadows: 0, whites: 0, blacks: 0,
                   contrast: 0, vibrance: 0, saturation: 0, clarity: 0,
-                  fade: 0, grain: 2, vignette: 4, sharpness: 8)
+                  fade: 0, grain: 0, vignette: 0, sharpness: 0)
         case .portra:
             .init(exposure: 0.12, temperature: 6900, tint: 5,
                   highlights: -8, shadows: 8, whites: -3, blacks: 5,

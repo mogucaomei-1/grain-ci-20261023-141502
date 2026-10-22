@@ -15,6 +15,7 @@
 		A10000000000000000000006 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* DesignSystem.swift */; };
 		A10000000000000000000008 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* Views.swift */; };
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* Assets.xcassets */; };
+		A10000000000000000000010 /* LookAdvisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* LookAdvisor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 		B10000000000000000000006 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		B10000000000000000000008 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
 		B10000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B10000000000000000000010 /* LookAdvisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookAdvisor.swift; sourceTree = "<group>"; };
 		B1000000000000000000000A /* GRAIN.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GRAIN.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -58,6 +60,7 @@
 				B10000000000000000000005 /* PhotosImporter.swift */,
 				B10000000000000000000006 /* DesignSystem.swift */,
 				B10000000000000000000008 /* Views.swift */,
+				B10000000000000000000010 /* LookAdvisor.swift */,
 				B10000000000000000000009 /* Assets.xcassets */,
 			);
 			path = GRAIN;
@@ -147,6 +150,7 @@
 				A10000000000000000000005 /* PhotosImporter.swift in Sources */,
 				A10000000000000000000006 /* DesignSystem.swift in Sources */,
 				A10000000000000000000008 /* Views.swift in Sources */,
+				A10000000000000000000010 /* LookAdvisor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -264,13 +268,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = GRAIN;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "用于将调色完成的照片存储到照片图库。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于读取照片图库和 iCloud 中的原始 RAW 文件。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -297,13 +302,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = GRAIN;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "用于将调色完成的照片存储到照片图库。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于读取照片图库和 iCloud 中的原始 RAW 文件。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
