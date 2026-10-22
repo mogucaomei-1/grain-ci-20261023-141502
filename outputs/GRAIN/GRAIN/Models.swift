@@ -64,26 +64,40 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
     var factorySettings: FilmSettings {
         switch self {
         case .neutral:
-            .init(exposure: 0, temperature: 6500, tint: 0, contrast: 1.02,
-                  saturation: 1.0, fade: 0.01, grain: 0.02, vignette: 0.04)
+            .init(exposure: 0, temperature: 6500, tint: 0,
+                  highlights: 0, shadows: 0, whites: 0, blacks: 0,
+                  contrast: 0, vibrance: 0, saturation: 0, clarity: 0,
+                  fade: 0, grain: 2, vignette: 4, sharpness: 8)
         case .portra:
-            .init(exposure: 0.12, temperature: 6900, tint: 5, contrast: 0.92,
-                  saturation: 0.91, fade: 0.10, grain: 0.18, vignette: 0.10)
+            .init(exposure: 0.12, temperature: 6900, tint: 5,
+                  highlights: -8, shadows: 8, whites: -3, blacks: 5,
+                  contrast: -8, vibrance: 5, saturation: -10, clarity: -4,
+                  fade: 10, grain: 18, vignette: 10, sharpness: 5)
         case .pro400h:
-            .init(exposure: 0.22, temperature: 7100, tint: -8, contrast: 0.88,
-                  saturation: 0.84, fade: 0.14, grain: 0.14, vignette: 0.06)
+            .init(exposure: 0.22, temperature: 7100, tint: -8,
+                  highlights: -10, shadows: 12, whites: -4, blacks: 8,
+                  contrast: -12, vibrance: 4, saturation: -16, clarity: -7,
+                  fade: 14, grain: 14, vignette: 6, sharpness: 4)
         case .gold:
-            .init(exposure: 0.02, temperature: 7600, tint: 8, contrast: 1.06,
-                  saturation: 1.10, fade: 0.08, grain: 0.22, vignette: 0.16)
+            .init(exposure: 0.02, temperature: 7600, tint: 8,
+                  highlights: -4, shadows: 6, whites: 4, blacks: 3,
+                  contrast: 6, vibrance: 10, saturation: 10, clarity: 2,
+                  fade: 8, grain: 22, vignette: 16, sharpness: 7)
         case .classicChrome:
-            .init(exposure: -0.04, temperature: 6200, tint: 1, contrast: 1.12,
-                  saturation: 0.72, fade: 0.05, grain: 0.14, vignette: 0.18)
+            .init(exposure: -0.04, temperature: 6200, tint: 1,
+                  highlights: -8, shadows: 4, whites: 4, blacks: 6,
+                  contrast: 12, vibrance: -8, saturation: -28, clarity: 4,
+                  fade: 5, grain: 14, vignette: 18, sharpness: 9)
         case .cinestill:
-            .init(exposure: 0.10, temperature: 4750, tint: -8, contrast: 0.96,
-                  saturation: 1.04, fade: 0.12, grain: 0.26, vignette: 0.22)
+            .init(exposure: 0.10, temperature: 4750, tint: -8,
+                  highlights: -5, shadows: 10, whites: -2, blacks: 4,
+                  contrast: -4, vibrance: 8, saturation: 4, clarity: -2,
+                  fade: 12, grain: 26, vignette: 22, sharpness: 2)
         case .hp5:
-            .init(exposure: 0.04, temperature: 6500, tint: 0, contrast: 1.14,
-                  saturation: 0.0, fade: 0.08, grain: 0.36, vignette: 0.16)
+            .init(exposure: 0.04, temperature: 6500, tint: 0,
+                  highlights: -4, shadows: 8, whites: 0, blacks: 6,
+                  contrast: 14, vibrance: 0, saturation: 0, clarity: 6,
+                  fade: 8, grain: 36, vignette: 16, sharpness: 10)
         }
     }
 }
@@ -92,11 +106,18 @@ struct FilmSettings: Equatable, Sendable {
     var exposure: Double
     var temperature: Double
     var tint: Double
+    var highlights: Double
+    var shadows: Double
+    var whites: Double
+    var blacks: Double
     var contrast: Double
+    var vibrance: Double
     var saturation: Double
+    var clarity: Double
     var fade: Double
     var grain: Double
     var vignette: Double
+    var sharpness: Double
 }
 
 enum ExportFormat: String, CaseIterable, Identifiable, Sendable {

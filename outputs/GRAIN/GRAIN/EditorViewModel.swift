@@ -31,6 +31,18 @@ final class EditorViewModel: ObservableObject {
         schedulePreview()
     }
 
+    func returnHome() {
+        previewTask?.cancel()
+        previewTask = nil
+        photo = nil
+        originalPreview = nil
+        editedPreview = nil
+        exportResult = nil
+        errorMessage = nil
+        isPreparing = false
+        isExporting = false
+    }
+
     func resetSelectedProfile() {
         withAnimation(.snappy(duration: 0.25)) {
             settings = selectedProfile.factorySettings

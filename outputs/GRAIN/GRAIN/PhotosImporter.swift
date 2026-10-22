@@ -3,6 +3,51 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct DocumentRawImporter: UIViewControllerRepresentable {
+    let onImport: (URL) -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(
+            forOpeningContentTypes: [.rawImage, .image],
+            asCopy: true
+        )
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        picker.shouldShowFileExtensions = true
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let parent: DocumentRawImporter
+
+        init(parent: DocumentRawImporter) {
+            self.parent = parent
+        }
+
+        func documentPicker(
+            _ controller: UIDocumentPickerViewController,
+            didPickDocumentsAt urls: [URL]
+        ) {
+            guard let url = urls.first else {
+                parent.onCancel()
+                return
+            }
+            parent.onImport(url)
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            parent.onCancel()
+        }
+    }
+}
+
 struct PhotosRawImporter: UIViewControllerRepresentable {
     let onImport: (URL) -> Void
     let onCancel: () -> Void

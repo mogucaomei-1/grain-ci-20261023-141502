@@ -1,11 +1,10 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct RootView: View {
     @EnvironmentObject private var editor: EditorViewModel
     @State private var showImportSource = false
     @State private var showPhotoPicker = false
-    @State private var showFileImporter = false
+    @State private var showDocumentPicker = false
     @State private var showExportSheet = false
 
     var body: some View {
@@ -15,6 +14,7 @@ struct RootView: View {
             VStack(spacing: 0) {
                 MinimalTopBar(
                     hasPhoto: editor.photo != nil,
+                    onBack: editor.returnHome,
                     onImport: { showImportSource = true },
                     onExport: {
                         editor.exportResult = nil
@@ -24,8 +24,8 @@ struct RootView: View {
 
                 if editor.photo == nil {
                     EmptyImportView(
-                        onOpenFiles: { showFileImporter = true },
-                        onOpenPhotos: { showPhotoPicker = true }
+                        onOpenPhotos: { showPhotoPicker = true },
+                        onOpenFiles: { showDocumentPicker = true }
                     )
                 } else {
                     EditorWorkspace()
@@ -33,8 +33,8 @@ struct RootView: View {
             }
         }
         .confirmationDialog("导入照片", isPresented: $showImportSource, titleVisibility: .visible) {
-            Button("从文件选择 Sony RAW") { showFileImporter = true }
             Button("从照片图库选择") { showPhotoPicker = true }
+            Button("从文件选择 Sony RAW") { showDocumentPicker = true }
             Button("取消", role: .cancel) {}
         } message: {
             Text("需要原始 ARW 请优先从“文件”导入，以避免照片图库返回 JPEG 副本。")
@@ -48,19 +48,14 @@ struct RootView: View {
             }
             .ignoresSafeArea()
         }
-        .fileImporter(
-            isPresented: $showFileImporter,
-            allowedContentTypes: supportedImportTypes,
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    editor.importPhoto(from: url)
-                }
-            case .failure(let error):
-                editor.errorMessage = error.localizedDescription
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentRawImporter { url in
+                showDocumentPicker = false
+                editor.importPhoto(from: url)
+            } onCancel: {
+                showDocumentPicker = false
             }
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $showExportSheet) {
             ExportSettingsSheet()
@@ -81,21 +76,28 @@ struct RootView: View {
         }
     }
 
-    private var supportedImportTypes: [UTType] {
-        let extensions = ["arw", "srf", "sr2", "dng"]
-        let vendorTypes = extensions.compactMap { UTType(filenameExtension: $0) }
-        return [.rawImage, .image] + vendorTypes
-    }
 }
 
 private struct MinimalTopBar: View {
     let hasPhoto: Bool
+    let onBack: () -> Void
     let onImport: () -> Void
     let onExport: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 9) {
+                if hasPhoto {
+                    Button(action: onBack) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 32, height: 38)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(GrainTheme.paper)
+                }
+
                 ZStack {
                     Circle().fill(GrainTheme.paper)
                     Circle()
@@ -148,8 +150,8 @@ private struct MinimalTopBar: View {
 }
 
 private struct EmptyImportView: View {
-    let onOpenFiles: () -> Void
     let onOpenPhotos: () -> Void
+    let onOpenFiles: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -179,10 +181,10 @@ private struct EmptyImportView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 36)
 
-            Button(action: onOpenFiles) {
+            Button(action: onOpenPhotos) {
                 HStack(spacing: 9) {
-                    Image(systemName: "folder")
-                    Text("从文件导入 RAW")
+                    Image(systemName: "photo.on.rectangle")
+                    Text("从照片图库选择")
                     Spacer()
                     Image(systemName: "arrow.right")
                         .foregroundStyle(GrainTheme.black.opacity(0.45))
@@ -197,10 +199,19 @@ private struct EmptyImportView: View {
             .padding(.horizontal, 34)
             .padding(.top, 32)
 
-            Button("从照片图库选择", action: onOpenPhotos)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(GrainTheme.muted)
-                .padding(.top, 16)
+            Button(action: onOpenFiles) {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder")
+                    Text("从文件导入 RAW")
+                }
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(GrainTheme.paper)
+                .padding(.horizontal, 16)
+                .frame(height: 42)
+                .background(GrainTheme.raised, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
 
             Spacer()
 
@@ -224,7 +235,7 @@ private struct EditorWorkspace: View {
                 .frame(height: 100)
 
             AdjustPanel()
-                .frame(height: 130)
+                .frame(height: 146)
         }
     }
 }
@@ -376,11 +387,39 @@ private struct FilmPresetBar: View {
     }
 }
 
+private enum AdjustCategory: String, CaseIterable, Identifiable {
+    case light
+    case color
+    case effects
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .light: "光线"
+        case .color: "颜色"
+        case .effects: "效果"
+        }
+    }
+}
+
 private enum AdjustTool: String, CaseIterable, Identifiable {
     case intensity
     case exposure
+    case contrast
+    case highlights
+    case shadows
+    case whites
+    case blacks
     case temperature
+    case tint
+    case vibrance
+    case saturation
+    case clarity
+    case sharpness
+    case fade
     case grain
+    case vignette
 
     var id: String { rawValue }
 
@@ -388,36 +427,87 @@ private enum AdjustTool: String, CaseIterable, Identifiable {
         switch self {
         case .intensity: "强度"
         case .exposure: "曝光"
+        case .contrast: "对比"
+        case .highlights: "高光"
+        case .shadows: "阴影"
+        case .whites: "白色"
+        case .blacks: "黑色"
         case .temperature: "色温"
+        case .tint: "色调"
+        case .vibrance: "自然饱和"
+        case .saturation: "饱和"
+        case .clarity: "清晰度"
+        case .sharpness: "锐化"
+        case .fade: "褪色"
         case .grain: "颗粒"
+        case .vignette: "暗角"
+        }
+    }
+
+    var category: AdjustCategory {
+        switch self {
+        case .exposure, .contrast, .highlights, .shadows, .whites, .blacks:
+            .light
+        case .temperature, .tint, .vibrance, .saturation:
+            .color
+        case .intensity, .clarity, .sharpness, .fade, .grain, .vignette:
+            .effects
         }
     }
 }
 
 private struct AdjustPanel: View {
     @EnvironmentObject private var editor: EditorViewModel
-    @State private var selectedTool: AdjustTool = .intensity
+    @State private var selectedCategory: AdjustCategory = .light
+    @State private var selectedTool: AdjustTool = .exposure
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 7) {
-                ForEach(AdjustTool.allCases) { tool in
+        VStack(spacing: 7) {
+            HStack(spacing: 22) {
+                ForEach(AdjustCategory.allCases) { category in
                     Button {
                         withAnimation(.easeOut(duration: 0.16)) {
-                            selectedTool = tool
+                            selectedCategory = category
+                            selectedTool = tools(for: category).first ?? .exposure
                         }
                     } label: {
-                        Text(tool.title)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(selectedTool == tool ? GrainTheme.black : GrainTheme.muted)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 31)
-                            .background(
-                                selectedTool == tool ? GrainTheme.paper : GrainTheme.surface,
-                                in: Capsule()
-                            )
+                        VStack(spacing: 4) {
+                            Text(category.title)
+                                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                                .foregroundStyle(
+                                    selectedCategory == category ? GrainTheme.paper : GrainTheme.muted
+                                )
+                            Capsule()
+                                .fill(selectedCategory == category ? GrainTheme.accent : .clear)
+                                .frame(width: 18, height: 2)
+                        }
                     }
                     .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 2)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(tools(for: selectedCategory)) { tool in
+                        Button {
+                            selectedTool = tool
+                        } label: {
+                            Text(tool.title)
+                                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                                .foregroundStyle(
+                                    selectedTool == tool ? GrainTheme.black : GrainTheme.muted
+                                )
+                                .padding(.horizontal, 13)
+                                .frame(height: 28)
+                                .background(
+                                    selectedTool == tool ? GrainTheme.paper : GrainTheme.raised,
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
 
@@ -430,11 +520,11 @@ private struct AdjustPanel: View {
                     .foregroundStyle(GrainTheme.paper)
                     .frame(width: 52, alignment: .trailing)
             }
-            .frame(height: 34)
+            .frame(height: 31)
         }
         .padding(.horizontal, 18)
-        .padding(.top, 9)
-        .padding(.bottom, 18)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
         .background(GrainTheme.surface)
         .overlay(alignment: .top) {
             Rectangle().fill(GrainTheme.line).frame(height: 1)
@@ -446,45 +536,19 @@ private struct AdjustPanel: View {
         case .intensity: 0...100
         case .exposure: -2...2
         case .temperature: 3500...9000
-        case .grain: 0...60
+        case .grain, .vignette, .fade, .sharpness: 0...100
+        default: -100...100
         }
     }
 
     private var activeBinding: Binding<Double> {
-        switch selectedTool {
-        case .intensity:
-            Binding(
-                get: { editor.intensity * 100 },
-                set: {
-                    editor.intensity = $0 / 100
-                    editor.schedulePreview()
-                }
-            )
-        case .exposure:
-            Binding(
-                get: { editor.settings.exposure },
-                set: {
-                    editor.settings.exposure = $0
-                    editor.schedulePreview()
-                }
-            )
-        case .temperature:
-            Binding(
-                get: { editor.settings.temperature },
-                set: {
-                    editor.settings.temperature = $0
-                    editor.schedulePreview()
-                }
-            )
-        case .grain:
-            Binding(
-                get: { editor.settings.grain * 100 },
-                set: {
-                    editor.settings.grain = $0 / 100
-                    editor.schedulePreview()
-                }
-            )
-        }
+        Binding(
+            get: { value(for: selectedTool) },
+            set: {
+                setValue($0, for: selectedTool)
+                editor.schedulePreview()
+            }
+        )
     }
 
     private var activeValueText: String {
@@ -495,8 +559,54 @@ private struct AdjustPanel: View {
             String(format: "%+.1f", editor.settings.exposure)
         case .temperature:
             "\(Int(editor.settings.temperature))K"
-        case .grain:
-            "\(Int(editor.settings.grain * 100))"
+        default:
+            String(format: "%+.0f", value(for: selectedTool))
+        }
+    }
+
+    private func tools(for category: AdjustCategory) -> [AdjustTool] {
+        AdjustTool.allCases.filter { $0.category == category }
+    }
+
+    private func value(for tool: AdjustTool) -> Double {
+        switch tool {
+        case .intensity: editor.intensity * 100
+        case .exposure: editor.settings.exposure
+        case .contrast: editor.settings.contrast
+        case .highlights: editor.settings.highlights
+        case .shadows: editor.settings.shadows
+        case .whites: editor.settings.whites
+        case .blacks: editor.settings.blacks
+        case .temperature: editor.settings.temperature
+        case .tint: editor.settings.tint
+        case .vibrance: editor.settings.vibrance
+        case .saturation: editor.settings.saturation
+        case .clarity: editor.settings.clarity
+        case .sharpness: editor.settings.sharpness
+        case .fade: editor.settings.fade
+        case .grain: editor.settings.grain
+        case .vignette: editor.settings.vignette
+        }
+    }
+
+    private func setValue(_ value: Double, for tool: AdjustTool) {
+        switch tool {
+        case .intensity: editor.intensity = value / 100
+        case .exposure: editor.settings.exposure = value
+        case .contrast: editor.settings.contrast = value
+        case .highlights: editor.settings.highlights = value
+        case .shadows: editor.settings.shadows = value
+        case .whites: editor.settings.whites = value
+        case .blacks: editor.settings.blacks = value
+        case .temperature: editor.settings.temperature = value
+        case .tint: editor.settings.tint = value
+        case .vibrance: editor.settings.vibrance = value
+        case .saturation: editor.settings.saturation = value
+        case .clarity: editor.settings.clarity = value
+        case .sharpness: editor.settings.sharpness = value
+        case .fade: editor.settings.fade = value
+        case .grain: editor.settings.grain = value
+        case .vignette: editor.settings.vignette = value
         }
     }
 }

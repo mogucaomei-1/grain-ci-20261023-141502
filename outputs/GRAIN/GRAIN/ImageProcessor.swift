@@ -272,10 +272,18 @@ struct RawImageProcessor {
         let targetTemperature = 6500 + (settings.temperature - 6500) * amount
         graded = graded.applyingFilter("CITemperatureAndTint", parameters: [
             "inputNeutral": CIVector(x: 6500, y: 0),
-            "inputTargetNeutral": CIVector(x: targetTemperature, y: settings.tint * amount)
+            "inputTargetNeutral": CIVector(x: targetTemperature, y: settings.tint * 0.8 * amount)
         ])
 
-        let fade = min(max(settings.fade * amount, 0), 0.30)
+        let shadowAmount = min(max((settings.shadows + settings.blacks * 0.35) / 100 * amount, -1), 1)
+        let highlightAmount = min(max(1 - (settings.highlights + settings.whites * 0.30) / 100 * 0.65 * amount, 0.25), 1.5)
+        graded = graded.applyingFilter("CIHighlightShadowAdjust", parameters: [
+            "inputRadius": 8.0,
+            "inputShadowAmount": shadowAmount,
+            "inputHighlightAmount": highlightAmount
+        ])
+
+        let fade = min(max(settings.fade / 100 * amount, 0), 0.30)
         graded = graded.applyingFilter("CIToneCurve", parameters: [
             "inputPoint0": CIVector(x: 0, y: fade),
             "inputPoint1": CIVector(x: 0.25, y: 0.25 + fade * 0.35),
@@ -284,12 +292,15 @@ struct RawImageProcessor {
             "inputPoint4": CIVector(x: 1, y: 1)
         ])
 
-        let contrast = 1 + (settings.contrast - 1) * amount
-        let saturation = 1 + (settings.saturation - 1) * amount
+        let contrast = 1 + settings.contrast / 100 * 0.45 * amount
+        let saturation = 1 + settings.saturation / 100 * amount
         graded = graded.applyingFilter("CIColorControls", parameters: [
             kCIInputContrastKey: contrast,
             kCIInputSaturationKey: saturation,
             kCIInputBrightnessKey: 0
+        ])
+        graded = graded.applyingFilter("CIVibrance", parameters: [
+            kCIInputAmountKey: settings.vibrance / 100 * amount
         ])
 
         if profile == .classicChrome {
@@ -318,7 +329,28 @@ struct RawImageProcessor {
                 ])
         }
 
-        let vignette = settings.vignette * amount
+        let clarity = settings.clarity * amount
+        if clarity > 0.2 {
+            graded = graded.applyingFilter("CIUnsharpMask", parameters: [
+                kCIInputRadiusKey: max(2, min(extent.width, extent.height) * 0.0022),
+                kCIInputIntensityKey: clarity / 100 * 0.62
+            ])
+        } else if clarity < -0.2 {
+            graded = graded
+                .applyingFilter("CIGaussianBlur", parameters: [
+                    kCIInputRadiusKey: min(3, abs(clarity) / 28)
+                ])
+                .cropped(to: extent)
+        }
+
+        let sharpness = settings.sharpness / 100 * amount
+        if sharpness > 0.01 {
+            graded = graded.applyingFilter("CISharpenLuminance", parameters: [
+                kCIInputSharpnessKey: min(sharpness * 1.4, 1)
+            ])
+        }
+
+        let vignette = settings.vignette / 100 * amount
         if vignette > 0.001 {
             graded = graded.applyingFilter("CIVignette", parameters: [
                 kCIInputIntensityKey: vignette * 1.8,
@@ -326,7 +358,7 @@ struct RawImageProcessor {
             ])
         }
 
-        let grain = settings.grain * amount
+        let grain = settings.grain / 100 * amount
         if grain > 0.001, let random = CIFilter(name: "CIRandomGenerator")?.outputImage {
             let noise = random
                 .transformed(by: CGAffineTransform(scaleX: grainScale, y: grainScale))
