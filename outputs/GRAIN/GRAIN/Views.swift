@@ -373,10 +373,6 @@ private struct PhotoEditorCanvas: View {
 
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedTextID = nil
-                            showFullscreen = true
-                        }
 
                     TextOverlayInteractionView(
                         overlays: editor.textOverlays,

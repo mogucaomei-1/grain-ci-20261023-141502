@@ -129,7 +129,7 @@ final class TextOverlayCanvasUIView: UIView, UIGestureRecognizerDelegate {
     }
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        itemViews.values.contains { $0.frame.contains(point) }
+        bounds.contains(point)
     }
 
     func gestureRecognizer(
