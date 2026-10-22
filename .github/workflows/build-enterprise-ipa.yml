@@ -22,7 +22,7 @@ concurrency:
 jobs:
   signed-ipa:
     name: Archive and export signed IPA
-    runs-on: macos-15
+    runs-on: macos-14
     timeout-minutes: 45
 
     env:
