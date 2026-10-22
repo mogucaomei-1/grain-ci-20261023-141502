@@ -407,6 +407,26 @@ private struct FullscreenPhotoView: View {
                     .tint(GrainTheme.paper)
             }
 
+            VStack(spacing: 0) {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 86)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        dismiss()
+                    }
+
+                Spacer()
+
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 82)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        dismiss()
+                    }
+            }
+
             VStack {
                 HStack {
                     Button {
@@ -433,13 +453,16 @@ private struct FullscreenPhotoView: View {
 
                 Spacer()
 
-                Text("双指缩放 · 拖动查看 · 双击复位")
+                Text("点上方或下方空白返回 · 双指缩放")
                     .font(.system(size: 9, weight: .medium, design: .rounded))
                     .foregroundStyle(GrainTheme.paper.opacity(0.72))
                     .padding(.horizontal, 12)
                     .frame(height: 28)
                     .background(Color.black.opacity(0.56), in: Capsule())
-                    .padding(.bottom, 18)
+                    .onTapGesture {
+                        dismiss()
+                    }
+                    .padding(.bottom, 28)
             }
         }
         .statusBarHidden()
