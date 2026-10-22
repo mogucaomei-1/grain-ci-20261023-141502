@@ -229,6 +229,7 @@ private struct PhotoEditorCanvas: View {
                             if let histogram = editor.histogram {
                                 HistogramView(data: histogram)
                                     .frame(width: 82, height: 46)
+                                    .offset(x: 5, y: -6)
                             }
 
                             if editor.isPreparing {
