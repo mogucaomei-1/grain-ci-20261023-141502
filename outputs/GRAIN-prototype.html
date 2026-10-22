@@ -21,10 +21,11 @@
     .status{height:34px;padding:8px 23px 0;display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700}
     .screen{height:calc(100% - 34px);display:flex;flex-direction:column}
     .topbar{height:54px;flex:none;padding:0 18px;display:flex;align-items:center;gap:10px}
-    .mark{width:29px;height:29px;border-radius:50%;background:var(--paper);position:relative}
-    .mark:before{content:"";position:absolute;left:7px;right:7px;top:11px;bottom:9px;border-radius:6px;background:var(--black)}
-    .mark:after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--accent);right:4px;top:8px;z-index:2}
-    .mark i{position:absolute;z-index:2;left:50%;top:20px;width:15px;height:15px;border:3px solid var(--black);border-radius:50%;transform:translate(-50%,-50%);background:var(--paper);box-shadow:inset 0 0 0 3px var(--accent)}
+    .mark{width:34px;height:29px;position:relative}
+    .mark:before{content:"";position:absolute;left:5px;top:9px;width:27px;height:16px;border-radius:4px;background:var(--paper)}
+    .mark .bump{position:absolute;left:12px;top:5px;width:11px;height:7px;border-radius:3px;background:var(--paper)}
+    .mark .lens{position:absolute;z-index:2;left:19px;top:17px;width:14px;height:14px;border:3px solid var(--black);border-radius:50%;transform:translate(-50%,-50%);background:#25251f;box-shadow:inset 0 0 0 2px #43848a}
+    .mark .shutter{position:absolute;z-index:3;width:4px;height:4px;border-radius:50%;background:var(--accent);right:3px;top:12px}
     .brand strong{display:block;font-size:14px;letter-spacing:2.1px;font-weight:900;line-height:1}
     .top-actions{margin-left:auto;display:flex;gap:9px}
     .round{width:38px;height:38px;border-radius:50%;border:0;background:var(--raised);display:grid;place-items:center;font-size:14px;cursor:pointer}
@@ -100,7 +101,7 @@
     <div class="screen">
       <header class="topbar">
         <button class="round" id="backHome" style="background:transparent;font-size:20px">‹</button>
-        <div class="mark"><i></i></div>
+        <div class="mark"><i class="bump"></i><i class="lens"></i><i class="shutter"></i></div>
         <div class="brand"><strong>GRAIN</strong></div>
         <div class="top-actions">
           <button class="round" id="albumButton" title="从相册选择">▧</button>
