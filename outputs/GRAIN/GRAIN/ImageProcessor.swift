@@ -118,6 +118,21 @@ struct RawImageProcessor {
         return original
     }
 
+    static func renderQuickPreview(from url: URL, maxDimension: Int = 1600) throws -> CGImage {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+            throw ImageProcessorError.cannotOpenFile
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimension
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            throw ImageProcessorError.cannotOpenFile
+        }
+        return image
+    }
+
     static func renderGradedPreview(
         source: CGImage,
         profile: FilmProfile,

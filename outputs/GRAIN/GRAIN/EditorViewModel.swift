@@ -240,6 +240,23 @@ final class EditorViewModel: ObservableObject {
         do {
             let localURL = try copyIntoLibrary(incomingURL)
             let asset = try RawImageProcessor.metadata(for: localURL)
+            let quickPreview = try RawImageProcessor.renderQuickPreview(from: localURL)
+
+            sourcePreview = quickPreview
+            originalPreview = quickPreview
+            fullGradedPreview = nil
+            editedPreview = nil
+            histogram = nil
+            crop = .identity
+            textOverlays = []
+            selectedProfile = .neutral
+            settings = FilmProfile.neutral.factorySettings
+            intensity = 1
+            photo = asset
+            exportOptions.keepLocation = asset.hasLocation
+            isPreparing = false
+            schedulePreview()
+
             importTask?.cancel()
             let generation = previewGeneration
             importTask = Task {
@@ -251,22 +268,12 @@ final class EditorViewModel: ObservableObject {
 
                     sourcePreview = source
                     originalPreview = source
-                    fullGradedPreview = nil
-                    editedPreview = nil
-                    histogram = nil
-                    crop = .identity
-                    textOverlays = []
-                    selectedProfile = .neutral
-                    settings = FilmProfile.neutral.factorySettings
-                    intensity = 1
-                    photo = asset
-                    exportOptions.keepLocation = asset.hasLocation
-                    isPreparing = false
                     schedulePreview()
                 } catch {
                     guard !Task.isCancelled else { return }
-                    isPreparing = false
-                    errorMessage = error.localizedDescription
+                    if incomingURL.pathExtension.lowercased().contains("arw") {
+                        noticeMessage = "已显示快速预览，但当前 iOS 无法解码该 RAW 的全尺寸图像。"
+                    }
                 }
             }
         } catch {
