@@ -90,7 +90,11 @@ private enum PhotoLibraryAssetLoader {
 
     static func loadOriginal(asset: PHAsset) async throws -> URL {
         let rawMarkers = ["arw", "srf", "sr2", "dng", "camera-raw"]
-        let resources = PHAssetResource.assetResources(for: asset)
+        let allResources = PHAssetResource.assetResources(for: asset)
+        let matchingResources = allResources.filter {
+            $0.assetLocalIdentifier == asset.localIdentifier
+        }
+        let resources = matchingResources.isEmpty ? allResources : matchingResources
         let rawResource = resources.first { resource in
             let identifier = resource.uniformTypeIdentifier.lowercased()
             let filename = resource.originalFilename.lowercased()
