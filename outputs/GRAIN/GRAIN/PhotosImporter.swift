@@ -38,7 +38,13 @@ struct PhotosRawImporter: UIViewControllerRepresentable {
                 return
             }
 
+            let rawExtensions = Set(["arw", "srf", "sr2", "dng"])
             let typeIdentifier = provider.registeredTypeIdentifiers.first { identifier in
+                guard let type = UTType(identifier),
+                      let fileExtension = type.preferredFilenameExtension
+                else { return false }
+                return rawExtensions.contains(fileExtension.lowercased())
+            } ?? provider.registeredTypeIdentifiers.first { identifier in
                 guard let type = UTType(identifier) else { return false }
                 return type.conforms(to: .rawImage)
             } ?? provider.registeredTypeIdentifiers.first { identifier in

@@ -3,778 +3,200 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#11110f">
-  <title>GRAIN — RAW Film Lab</title>
+  <meta name="theme-color" content="#070706">
+  <title>GRAIN 1.1</title>
   <style>
     :root {
-      --ink: #11110f;
-      --panel: #1a1a17;
-      --raised: #24241f;
-      --paper: #f1e9dc;
-      --muted: #aaa398;
-      --line: rgba(255,255,255,.1);
-      --accent: #d9774e;
-      --sage: #879682;
-      --filter: saturate(.9) contrast(.96) sepia(.08) brightness(1.03);
-      --tint: rgba(196,128,82,.04);
+      --black:#070706; --surface:#131311; --raised:#1d1d1a;
+      --paper:#f4ede1; --muted:#8e8b84; --line:rgba(255,255,255,.09);
+      --accent:#d9774e; --filter:saturate(.9) contrast(.95) sepia(.08) brightness(1.03);
     }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { margin: 0; min-height: 100%; background: #090908; color: var(--paper); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Helvetica Neue", sans-serif; }
-    body { display: grid; place-items: center; min-height: 100svh; overflow: hidden; }
-    body::before { content:""; position: fixed; inset: 0; background: radial-gradient(circle at 80% 7%, rgba(217,119,78,.12), transparent 31%), linear-gradient(140deg,#161511,#070706); }
-    button, input { font: inherit; }
-    button { color: inherit; }
-
-    .phone {
-      position: relative;
-      width: min(430px, 100vw);
-      height: min(932px, 100svh);
-      overflow: hidden;
-      background:
-        radial-gradient(circle at 92% 2%, rgba(217,119,78,.11), transparent 28%),
-        var(--ink);
-      border-radius: 44px;
-      box-shadow: 0 45px 110px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.12);
-    }
-    .phone::after {
-      content:"";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      opacity: .055;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
-      mix-blend-mode: soft-light;
-    }
-    .status {
-      height: 34px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 23px 0;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .2px;
-    }
-    .status-icons { display:flex; align-items:center; gap:6px; font-size:10px; }
-
-    .screen { height: calc(100% - 34px); display:flex; flex-direction:column; }
-    .topbar {
-      flex: none;
-      display:flex;
-      align-items:center;
-      padding: 8px 20px 13px;
-    }
-    .brandmark {
-      width: 38px; height: 38px; border-radius: 50%;
-      background: var(--paper);
-      position: relative;
-      margin-right: 11px;
-      overflow:hidden;
-    }
-    .brandmark::before {
-      content:"";
-      position:absolute;
-      left:8px; right:8px; top:8px; bottom:8px;
-      border: 2.4px solid var(--ink);
-      border-bottom-color: transparent;
-      border-radius: 50%;
-      transform: rotate(-8deg);
-    }
-    .brandmark::after {
-      content:"";
-      position:absolute;
-      width:7px;height:7px;border-radius:50%;
-      background:var(--accent);
-      right:7px;top:10px;
-    }
-    .brand { line-height:1; }
-    .brand strong { display:block; font-size:18px; letter-spacing:3px; font-weight:900; }
-    .brand span { display:block; font: 700 7.5px/1.7 ui-monospace, Menlo, monospace; letter-spacing:2.1px; color:var(--muted); }
-    .import {
-      margin-left:auto;
-      border:0;
-      border-radius:999px;
-      background:var(--paper);
-      color:var(--ink);
-      height:37px;
-      padding:0 14px;
-      display:flex;align-items:center;gap:7px;
-      font-size:12px;font-weight:750;
-      cursor:pointer;
-      transition:transform .18s ease, filter .18s ease;
-    }
-    .import:active { transform:scale(.96); filter:brightness(.9); }
-    .import .plus { font-size:18px;font-weight:400;margin-top:-2px; }
-
-    .main {
-      min-height: 0;
-      overflow-y:auto;
-      scrollbar-width:none;
-      padding: 4px 20px 94px;
-      overscroll-behavior: contain;
-    }
-    .main::-webkit-scrollbar { display:none; }
-    .title-row { display:flex;align-items:flex-end;gap:12px;margin-bottom:13px; }
-    .title-block { flex:1; min-width:0; }
-    h1 { font-family: "Iowan Old Style", "Songti SC", Georgia, serif; font-size:29px; letter-spacing:-.8px; line-height:1.08; margin:0 0 4px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .tagline { color:var(--muted); font-size:11px; letter-spacing:.15px; }
-    .frame-no { color:var(--accent); font:700 8px/1 ui-monospace, Menlo, monospace; letter-spacing:1.2px; padding-bottom:3px; white-space:nowrap; }
-
-    .canvas {
-      position:relative;
-      width:100%;
-      aspect-ratio:4/5;
-      border-radius:24px;
-      overflow:hidden;
-      background:#1a1a16;
-      box-shadow:0 24px 45px rgba(0,0,0,.36);
-      isolation:isolate;
-      border:1px solid rgba(255,255,255,.12);
-      touch-action:none;
-    }
-    .visual { position:absolute; inset:0; overflow:hidden; }
-    .visual > svg, .visual > img {
-      width:100%;height:100%;display:block;
-      object-fit:cover;
-      object-position:center;
-    }
-    #editedLayer { filter:var(--filter); }
-    #editedLayer::after {
-      content:"";
-      position:absolute;inset:0;
-      background:var(--tint);
-      pointer-events:none;
-      mix-blend-mode:color;
-    }
-    #originalLayer { clip-path: inset(0 calc(100% - var(--split, 44%)) 0 0); filter:saturate(.26) contrast(.94); }
-    .compare-line {
-      position:absolute;
-      top:0;bottom:0;left:var(--split,44%);
-      width:1px;background:rgba(255,255,255,.88);
-      box-shadow:0 0 8px rgba(0,0,0,.35);
-      pointer-events:none;
-      z-index:4;
-    }
-    .compare-handle {
-      position:absolute;
-      top:50%;left:var(--split,44%);
-      transform:translate(-50%,-50%);
-      width:34px;height:34px;
-      border-radius:50%;
-      border:1px solid rgba(255,255,255,.8);
-      background:rgba(28,27,24,.55);
-      backdrop-filter:blur(12px);
-      -webkit-backdrop-filter:blur(12px);
-      display:grid;place-items:center;
-      color:white;font-size:10px;font-weight:900;
-      letter-spacing:-2px;
-      z-index:5;
-      pointer-events:none;
-    }
-    .canvas-ui { position:absolute;inset:0;z-index:3;padding:12px;display:flex;flex-direction:column;pointer-events:none; }
-    .canvas-top, .canvas-bottom { display:flex;justify-content:space-between;align-items:center; }
-    .canvas-bottom { margin-top:auto; }
-    .pill {
-      min-height:23px;padding:0 9px;
-      display:flex;align-items:center;
-      border-radius:999px;
-      background:rgba(7,7,6,.48);
-      border:1px solid rgba(255,255,255,.16);
-      backdrop-filter:blur(8px);
-      font:800 8px/1 ui-monospace, Menlo, monospace;
-      letter-spacing:.8px;
-    }
-    .pill.orange { background:var(--accent);border-color:transparent;color:var(--ink); }
-    .canvas-note { text-shadow:0 1px 8px #000; font:700 7.5px/1 ui-monospace, Menlo, monospace; letter-spacing:.55px;color:rgba(255,255,255,.84); }
-
-    .metadata {
-      margin-top:12px;
-      height:56px;
-      display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;
-      align-items:center;
-      padding:0 8px;
-      border-radius:16px;
-      background:var(--panel);
-      border:1px solid var(--line);
-    }
-    .meta { text-align:center; padding:0 4px; overflow:hidden; }
-    .meta strong { display:block; font:650 9.5px/1.3 ui-monospace, Menlo, monospace; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-    .meta span { display:block;color:var(--muted);font-size:8.5px;margin-top:2px; }
-    .sep { width:1px;height:27px;background:var(--line); }
-
-    .eyebrow { display:flex;align-items:center;gap:9px;margin:20px 0 10px;color:var(--muted); }
-    .eyebrow b { color:var(--accent);font:800 8px/1 ui-monospace, Menlo, monospace; }
-    .eyebrow .rule { height:1px;flex:1;background:var(--line); }
-    .eyebrow span { font:700 8.5px/1 ui-monospace, Menlo, monospace;letter-spacing:1.35px;white-space:nowrap; }
-    .eyebrow em { font:600 9px/1 -apple-system,sans-serif;font-style:normal;white-space:nowrap; }
-    .film-strip {
-      display:flex;gap:8px;overflow-x:auto;
-      scrollbar-width:none;
-      padding:2px 2px 5px;
-      scroll-snap-type:x proximity;
-    }
-    .film-strip::-webkit-scrollbar { display:none; }
-    .film {
-      flex:0 0 92px;
-      border:1px solid transparent;
-      border-radius:14px;
-      padding:4px;
-      background:transparent;
-      cursor:pointer;
-      scroll-snap-align:start;
-    }
-    .film.active { background:var(--raised);border-color:rgba(255,255,255,.06); }
-    .swatch {
-      height:65px;border-radius:10px;overflow:hidden;
-      display:flex;align-items:flex-end;
-      padding:8px;
-      color:white;
-      font:800 8px/1 ui-monospace, Menlo, monospace;
-      letter-spacing:.8px;
-      box-shadow:inset 0 -35px 35px rgba(0,0,0,.28);
-      transition:transform .2s ease;
-    }
-    .film:active .swatch { transform:scale(.96); }
-    .film .name { margin-top:6px;padding:0 3px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left; }
-    .film.active .name { color:var(--paper);font-weight:650; }
-
-    .controls { background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:13px 14px 11px; }
-    .control { height:38px;display:grid;grid-template-columns:20px 34px 1fr 44px;align-items:center;gap:8px; }
-    .control i { font-style:normal;color:var(--muted);font-size:11px;text-align:center; }
-    .control label { font-size:11px;color:var(--muted); }
-    .control output { text-align:right;font:600 9px/1 ui-monospace, Menlo, monospace; }
-    input[type=range] { width:100%;height:22px;margin:0;appearance:none;background:transparent;cursor:pointer; }
-    input[type=range]::-webkit-slider-runnable-track { height:2px;background:linear-gradient(90deg,var(--accent) 0 var(--p,50%),rgba(255,255,255,.14) var(--p,50%));border-radius:4px; }
-    input[type=range]::-webkit-slider-thumb { appearance:none;width:11px;height:11px;border-radius:50%;background:var(--paper);margin-top:-4.5px;box-shadow:0 0 0 3px rgba(241,233,220,.08); }
-    .control-footer { margin-top:7px;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:9px; }
-    .control-footer button { margin-left:auto;border:0;background:none;color:var(--accent);font-size:9.5px;font-weight:700;cursor:pointer; }
-    .disclaimer { margin:12px 2px 0;color:rgba(170,163,152,.66);font-size:9px;line-height:1.55; }
-
-    .dock {
-      position:absolute;z-index:20;
-      left:26px;right:26px;bottom:max(11px,env(safe-area-inset-bottom));
-      height:52px;border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(30,30,26,.82);
-      backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
-      display:flex;gap:6px;padding:5px;
-      box-shadow:0 12px 35px rgba(0,0,0,.38);
-    }
-    .dock button {
-      flex:1;border:0;border-radius:999px;background:transparent;
-      color:var(--muted);font-size:10.5px;font-weight:650;
-      display:flex;align-items:center;justify-content:center;gap:6px;
-      cursor:pointer;
-    }
-    .dock button.active { background:var(--paper);color:var(--ink); }
-    .dock .ico { font-size:12px; }
-
-    .sheet-backdrop {
-      position:absolute;inset:0;z-index:30;
-      background:rgba(0,0,0,.62);
-      backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
-      opacity:0;pointer-events:none;transition:opacity .25s ease;
-    }
-    .sheet {
-      position:absolute;z-index:31;left:0;right:0;bottom:0;
-      min-height:520px;
-      border-radius:28px 28px 0 0;
-      background:#171714;
-      border-top:1px solid rgba(255,255,255,.13);
-      padding:10px 20px max(20px,env(safe-area-inset-bottom));
-      transform:translateY(105%);
-      transition:transform .34s cubic-bezier(.22,.8,.2,1);
-      box-shadow:0 -24px 60px rgba(0,0,0,.46);
-    }
-    .sheet-open .sheet-backdrop { opacity:1;pointer-events:auto; }
-    .sheet-open .sheet { transform:translateY(0); }
-    .grabber { width:34px;height:4px;border-radius:3px;background:rgba(255,255,255,.25);margin:0 auto 18px; }
-    .sheet-head { display:flex;align-items:flex-start; }
-    .sheet h2 { font:700 25px/1.1 "Iowan Old Style","Songti SC",serif;margin:0 0 5px; }
-    .sheet-sub { color:var(--muted);font-size:10px;line-height:1.45; }
-    .close { margin-left:auto;width:31px;height:31px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.04);cursor:pointer; }
-    .spec-card { margin-top:16px;border:1px solid var(--line);border-radius:19px;background:var(--panel);padding:0 14px; }
-    .spec { height:53px;display:flex;align-items:center;gap:11px; }
-    .spec + .spec { border-top:1px solid var(--line); }
-    .spec .icon { width:22px;color:var(--accent);text-align:center;font-size:13px; }
-    .spec .info { flex:1; }
-    .spec .info span { display:block;font-size:8.5px;color:var(--muted);margin-bottom:2px; }
-    .spec .info strong { display:block;font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-    .spec em { font:600 8px/1 ui-monospace,Menlo,monospace;color:var(--muted);font-style:normal; }
-    .sheet .eyebrow { margin:17px 0 9px; }
-    .format-row { display:flex;gap:9px; }
-    .format {
-      flex:1;border:1px solid var(--line);border-radius:15px;background:var(--raised);
-      padding:12px;text-align:left;cursor:pointer;
-    }
-    .format.active { border-color:rgba(217,119,78,.8); }
-    .format strong { font:700 13px/1 ui-monospace,Menlo,monospace;display:block; }
-    .format span { color:var(--muted);font-size:8.5px;display:block;margin-top:5px; }
-    .toggle-card { border:1px solid var(--line);border-radius:19px;background:var(--panel);padding:0 14px; }
-    .toggle-row { min-height:59px;display:flex;align-items:center;gap:11px; }
-    .toggle-row + .toggle-row { border-top:1px solid var(--line); }
-    .toggle-row .info { flex:1; }
-    .toggle-row strong { display:block;font-size:11px;font-weight:650; }
-    .toggle-row span { display:block;font-size:8.5px;color:var(--muted);margin-top:3px; }
-    .toggle { position:relative;width:42px;height:25px;flex:none; }
-    .toggle input { opacity:0;width:0;height:0; }
-    .toggle i { position:absolute;inset:0;border-radius:999px;background:rgba(255,255,255,.14);transition:.2s; }
-    .toggle i::after { content:"";position:absolute;width:19px;height:19px;left:3px;top:3px;border-radius:50%;background:white;transition:.2s; }
-    .toggle input:checked + i { background:var(--accent); }
-    .toggle input:checked + i::after { transform:translateX(17px); }
-    .export-btn {
-      width:100%;height:52px;border:0;border-radius:16px;
-      margin-top:17px;background:var(--paper);color:var(--ink);
-      padding:0 17px;display:flex;align-items:center;gap:10px;
-      font-size:13px;font-weight:800;cursor:pointer;
-    }
-    .export-btn span:last-child { margin-left:auto;color:rgba(17,17,15,.55);font:800 8px/1 ui-monospace,Menlo,monospace; }
-    .privacy-note { color:rgba(170,163,152,.7);font-size:8.5px;line-height:1.5;margin:11px 1px 0; }
-
-    .toast {
-      position:absolute;z-index:50;left:50%;bottom:82px;
-      transform:translate(-50%,16px);opacity:0;pointer-events:none;
-      max-width:calc(100% - 48px);
-      border-radius:999px;background:rgba(241,233,220,.96);color:var(--ink);
-      padding:10px 15px;font-size:10px;font-weight:700;text-align:center;
-      box-shadow:0 12px 30px rgba(0,0,0,.4);
-      transition:.25s ease;
-    }
-    .toast.show { opacity:1;transform:translate(-50%,0); }
-    .file-input { display:none; }
-
-    @media (max-width: 560px) {
-      body { display:block; background:var(--ink); }
-      body::before { display:none; }
-      .phone { width:100vw;height:100svh;border-radius:0;box-shadow:none; }
-    }
-    @media (max-height:760px) and (min-width:561px) {
-      .phone { height:100svh;border-radius:0; }
-    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;background:#050505;color:var(--paper);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Rounded","Helvetica Neue",sans-serif}
+    body{display:grid;place-items:center;min-height:100svh;overflow:hidden}
+    body:before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 82% 2%,rgba(217,119,78,.11),transparent 30%),#050505}
+    button,input{font:inherit}
+    button{color:inherit}
+    .phone{position:relative;width:min(430px,100vw);height:min(932px,100svh);overflow:hidden;background:var(--black);border-radius:44px;box-shadow:0 40px 100px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.12)}
+    .status{height:34px;padding:8px 23px 0;display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700}
+    .screen{height:calc(100% - 34px);display:flex;flex-direction:column}
+    .topbar{height:54px;flex:none;padding:0 18px;display:flex;align-items:center;gap:10px}
+    .mark{width:29px;height:29px;border-radius:50%;background:var(--paper);position:relative}
+    .mark:before{content:"";position:absolute;inset:6px;border:1.8px solid var(--black);border-bottom-color:transparent;border-radius:50%;transform:rotate(-16deg)}
+    .mark:after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--accent);right:3px;top:5px}
+    .brand strong{display:block;font-size:14px;letter-spacing:2.1px;font-weight:900;line-height:1}
+    .brand span{display:block;margin-top:3px;color:var(--muted);font:600 6.5px/1 ui-monospace,Menlo,monospace;letter-spacing:1.3px}
+    .top-actions{margin-left:auto;display:flex;gap:9px}
+    .round{width:38px;height:38px;border-radius:50%;border:0;background:var(--raised);display:grid;place-items:center;font-size:14px;cursor:pointer}
+    .round.export{background:var(--paper);color:var(--black);font-weight:900}
+    .workspace{flex:1;min-height:0;display:flex;flex-direction:column}
+    .photo{flex:1;min-height:0;margin:0 12px;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .image-box{position:relative;width:100%;aspect-ratio:3/2;max-height:100%}
+    .photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:var(--filter);transition:filter .2s ease,opacity .12s ease}
+    .photo img.original{filter:none;opacity:0}
+    .photo.holding img.original{opacity:1}
+    .photo-top,.photo-bottom{position:absolute;left:13px;right:13px;z-index:2;display:flex;justify-content:space-between;align-items:center}
+    .photo-top{top:13px}.photo-bottom{bottom:13px}
+    .pill{height:27px;border-radius:999px;background:rgba(0,0,0,.52);padding:0 10px;display:flex;align-items:center;font-size:8px;font-weight:700;letter-spacing:.5px;backdrop-filter:blur(8px)}
+    .pill.active{color:var(--paper)}
+    .spinner{width:13px;height:13px;border:1.5px solid rgba(255,255,255,.25);border-top-color:var(--paper);border-radius:50%;animation:spin .8s linear infinite;opacity:0}
+    .photo.loading .spinner{opacity:1}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .filmbar{height:100px;flex:none;padding-top:8px}
+    .section-head{height:20px;padding:0 18px;display:flex;align-items:center;gap:8px}
+    .section-head b{font:800 8px/1 ui-monospace,Menlo,monospace;letter-spacing:1.5px;color:var(--muted)}
+    .section-head span{font-size:10px;font-weight:650}
+    .section-head button{margin-left:auto;border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer}
+    .films{display:flex;gap:5px;overflow-x:auto;padding:6px 16px 0;scrollbar-width:none}
+    .films::-webkit-scrollbar{display:none}
+    .film{flex:0 0 auto;border:0;background:transparent;padding:4px;border-radius:13px;width:80px;cursor:pointer}
+    .film.active{background:var(--raised);box-shadow:inset 0 0 0 1px rgba(217,119,78,.8)}
+    .film .swatch{width:71px;height:49px;border-radius:9px;padding:7px;display:flex;align-items:flex-end;color:white;font:800 7.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.7px;box-shadow:inset 0 -24px 25px rgba(0,0,0,.32)}
+    .film .name{margin-top:6px;width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:9.5px;text-align:left}
+    .film.active .name{color:var(--paper);font-weight:650}
+    .controls{height:130px;flex:none;background:var(--surface);border-top:1px solid var(--line);padding:9px 18px 18px}
+    .tools{display:flex;gap:7px}
+    .tool{flex:1;height:31px;border:0;border-radius:999px;background:var(--surface);color:var(--muted);font-size:10px;font-weight:650;cursor:pointer}
+    .tool.active{background:var(--paper);color:var(--black)}
+    .slider-row{height:44px;display:flex;align-items:center;gap:12px}
+    input[type=range]{appearance:none;width:100%;height:22px;background:transparent}
+    input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:2px;background:linear-gradient(90deg,var(--accent) 0 var(--p,50%),rgba(255,255,255,.14) var(--p,50%))}
+    input[type=range]::-webkit-slider-thumb{appearance:none;width:11px;height:11px;margin-top:-4.5px;border-radius:50%;background:var(--paper);box-shadow:0 0 0 3px rgba(244,237,225,.08)}
+    output{width:52px;text-align:right;font:600 9px/1 ui-monospace,Menlo,monospace}
+    .home-indicator{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);height:5px;width:134px;border-radius:5px;background:rgba(255,255,255,.7);z-index:10}
+    .overlay{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.66);display:none}
+    .sheet{position:absolute;z-index:21;left:0;right:0;bottom:0;border-radius:28px 28px 0 0;background:#11110f;border-top:1px solid rgba(255,255,255,.1);padding:11px 20px 34px;transform:translateY(105%);transition:.32s cubic-bezier(.22,.8,.2,1)}
+    .sheet-open .overlay{display:block}.sheet-open .sheet{transform:translateY(0)}
+    .grab{width:34px;height:4px;border-radius:4px;background:rgba(255,255,255,.23);margin:0 auto 17px}
+    .sheet-title{display:flex;align-items:flex-start}
+    .sheet-title h2{font:700 25px/1 "Iowan Old Style","Songti SC",serif;margin:0 0 4px}
+    .sheet-title p{font-size:9px;color:var(--muted);margin:0}
+    .close{margin-left:auto;border:0;width:30px;height:30px;border-radius:50%;background:var(--raised);cursor:pointer}
+    .facts{margin:16px 0;padding:12px 0;background:var(--surface);border-radius:16px;display:flex;align-items:center}
+    .fact{flex:1;text-align:center}.fact strong{display:block;font:650 10px/1.3 ui-monospace,Menlo,monospace}.fact span{display:block;font-size:8px;color:var(--muted);margin-top:3px}
+    .sep{height:30px;width:1px;background:var(--line)}
+    .formats{display:flex;gap:9px;margin-bottom:13px}
+    .format{flex:1;padding:12px;text-align:left;border-radius:14px;background:var(--surface);border:1px solid var(--line);cursor:pointer}
+    .format.active{border-color:var(--accent)}
+    .format strong{font:700 12px/1 ui-monospace,Menlo,monospace}.format span{display:block;font-size:8.5px;color:var(--muted);margin-top:4px}
+    .toggle-row{height:51px;display:flex;align-items:center;border-top:1px solid var(--line)}
+    .toggle-row div{flex:1}.toggle-row strong{display:block;font-size:11px}.toggle-row small{display:block;font-size:8px;color:var(--muted);margin-top:3px}
+    .switch{position:relative;width:41px;height:24px}.switch input{opacity:0;width:0;height:0}.switch i{position:absolute;inset:0;border-radius:20px;background:rgba(255,255,255,.13)}.switch i:after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:white;transition:.2s}.switch input:checked+i{background:var(--accent)}.switch input:checked+i:after{transform:translateX(17px)}
+    .export-btn{width:100%;height:51px;border:0;border-radius:15px;background:var(--paper);color:var(--black);margin-top:14px;display:flex;align-items:center;gap:9px;padding:0 16px;font-size:13px;font-weight:800;cursor:pointer}
+    .export-btn small{margin-left:auto;font:800 8px/1 ui-monospace,Menlo,monospace;color:rgba(0,0,0,.5)}
+    input[type=file]{display:none}
+    @media(max-width:560px){body{display:block;background:var(--black)}body:before{display:none}.phone{width:100vw;height:100svh;border-radius:0;box-shadow:none}}
   </style>
 </head>
 <body>
   <div class="phone" id="phone">
-    <div class="status">
-      <span id="clock">09:41</span>
-      <span class="status-icons">•••• <span>▮▮▮</span> <span>⌁</span></span>
-    </div>
-
+    <div class="status"><span>16:40</span><span>••••　▮▮▮　⌁</span></div>
     <div class="screen">
       <header class="topbar">
-        <div class="brandmark" aria-hidden="true"></div>
-        <div class="brand"><strong>GRAIN</strong><span>RAW FILM LAB</span></div>
-        <button class="import" id="importButton" type="button"><span class="plus">＋</span> 导入 RAW</button>
-        <input class="file-input" id="fileInput" type="file" accept=".arw,.ARW,.dng,.DNG,image/*">
+        <div class="mark"></div>
+        <div class="brand"><strong>GRAIN</strong><span>RAW FILM LAB 1.1</span></div>
+        <div class="top-actions">
+          <button class="round" id="importButton">＋</button>
+          <button class="round export" id="openExport">↗</button>
+        </div>
+        <input id="fileInput" type="file" accept=".arw,.ARW,.dng,.DNG,image/*">
       </header>
 
-      <main class="main" id="main">
-        <div class="title-row">
-          <div class="title-block">
-            <h1 id="photoTitle">暮色之后</h1>
-            <div class="tagline">把数字底片，洗成时间。</div>
-          </div>
-          <div class="frame-no" id="frameNo">DEMO FRAME</div>
-        </div>
-
-        <section class="canvas" id="canvas">
-          <div class="visual" id="editedLayer">
-            <svg viewBox="0 0 1200 1500" preserveAspectRatio="xMidYMid slice" aria-label="黄昏湖畔的示例画面">
-              <defs>
-                <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#25353c"/><stop offset=".51" stop-color="#745b50"/><stop offset="1" stop-color="#d18a61"/>
-                </linearGradient>
-                <radialGradient id="sun"><stop offset="0" stop-color="#ffe5b6"/><stop offset=".2" stop-color="#f0b37a" stop-opacity=".65"/><stop offset="1" stop-color="#e9a06e" stop-opacity="0"/></radialGradient>
-                <linearGradient id="land" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#33403e"/><stop offset="1" stop-color="#121817"/></linearGradient>
-                <linearGradient id="water" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#795543"/><stop offset="1" stop-color="#25231f"/></linearGradient>
-                <filter id="soft"><feGaussianBlur stdDeviation="13"/></filter>
-              </defs>
-              <rect width="1200" height="1500" fill="url(#sky)"/>
-              <circle cx="824" cy="404" r="225" fill="url(#sun)"/>
-              <path d="M0 815 C214 567 382 622 565 757 C741 887 936 704 1200 714 L1200 1500 L0 1500Z" fill="url(#land)"/>
-              <path d="M0 984 C250 865 455 912 634 1010 C815 1109 998 922 1200 930 L1200 1500 L0 1500Z" fill="url(#water)"/>
-              <path d="M291 975 C475 923 607 986 748 1086" fill="none" stroke="#e2b17c" stroke-width="5" stroke-linecap="round" opacity=".28"/>
-              <path d="M116 1081 C318 1014 487 1065 636 1167" fill="none" stroke="#f2d1a5" stroke-width="3" stroke-linecap="round" opacity=".15"/>
-              <ellipse cx="809" cy="1001" rx="340" ry="79" fill="#d59b69" opacity=".14" filter="url(#soft)"/>
-              <g transform="translate(426 962)">
-                <ellipse cx="10" cy="211" rx="115" ry="23" fill="#070908" opacity=".35" filter="url(#soft)"/>
-                <path d="M-27 29 C-3 34 33 34 55 27 L84 167 C64 190 31 202 2 198 C-19 190 -35 178 -48 169Z" fill="#a64230"/>
-                <circle cx="16" cy="-19" r="31" fill="#201d19"/>
-                <path d="M-12 -7 C-2 -33 24 -43 41 -17 C45 -8 43 1 39 6 L-9 10Z" fill="#1a1816"/>
-                <path d="M-26 181 L-50 306" stroke="#171613" stroke-width="18" stroke-linecap="round"/>
-                <path d="M29 180 L58 304" stroke="#171613" stroke-width="18" stroke-linecap="round"/>
-                <path d="M-8 58 L-74 149" stroke="#9e3c2d" stroke-width="22" stroke-linecap="round"/>
-                <path d="M41 57 L103 124" stroke="#9e3c2d" stroke-width="22" stroke-linecap="round"/>
-              </g>
-              <rect width="1200" height="1500" fill="none"/>
-            </svg>
-          </div>
-          <div class="visual" id="originalLayer">
-            <svg viewBox="0 0 1200 1500" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-              <defs>
-                <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#25353c"/><stop offset=".51" stop-color="#745b50"/><stop offset="1" stop-color="#d18a61"/></linearGradient>
-                <radialGradient id="sun2"><stop offset="0" stop-color="#ffe5b6"/><stop offset=".2" stop-color="#f0b37a" stop-opacity=".65"/><stop offset="1" stop-color="#e9a06e" stop-opacity="0"/></radialGradient>
-                <linearGradient id="land2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#33403e"/><stop offset="1" stop-color="#121817"/></linearGradient>
-                <linearGradient id="water2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#795543"/><stop offset="1" stop-color="#25231f"/></linearGradient>
-                <filter id="soft2"><feGaussianBlur stdDeviation="13"/></filter>
-              </defs>
-              <rect width="1200" height="1500" fill="url(#sky2)"/>
-              <circle cx="824" cy="404" r="225" fill="url(#sun2)"/>
-              <path d="M0 815 C214 567 382 622 565 757 C741 887 936 704 1200 714 L1200 1500 L0 1500Z" fill="url(#land2)"/>
-              <path d="M0 984 C250 865 455 912 634 1010 C815 1109 998 922 1200 930 L1200 1500 L0 1500Z" fill="url(#water2)"/>
-              <path d="M291 975 C475 923 607 986 748 1086" fill="none" stroke="#e2b17c" stroke-width="5" stroke-linecap="round" opacity=".28"/>
-              <path d="M116 1081 C318 1014 487 1065 636 1167" fill="none" stroke="#f2d1a5" stroke-width="3" stroke-linecap="round" opacity=".15"/>
-              <ellipse cx="809" cy="1001" rx="340" ry="79" fill="#d59b69" opacity=".14" filter="url(#soft2)"/>
-              <g transform="translate(426 962)">
-                <ellipse cx="10" cy="211" rx="115" ry="23" fill="#070908" opacity=".35" filter="url(#soft2)"/>
-                <path d="M-27 29 C-3 34 33 34 55 27 L84 167 C64 190 31 202 2 198 C-19 190 -35 178 -48 169Z" fill="#a64230"/>
-                <circle cx="16" cy="-19" r="31" fill="#201d19"/>
-                <path d="M-12 -7 C-2 -33 24 -43 41 -17 C45 -8 43 1 39 6 L-9 10Z" fill="#1a1816"/>
-                <path d="M-26 181 L-50 306" stroke="#171613" stroke-width="18" stroke-linecap="round"/>
-                <path d="M29 180 L58 304" stroke="#171613" stroke-width="18" stroke-linecap="round"/>
-                <path d="M-8 58 L-74 149" stroke="#9e3c2d" stroke-width="22" stroke-linecap="round"/>
-                <path d="M41 57 L103 124" stroke="#9e3c2d" stroke-width="22" stroke-linecap="round"/>
-              </g>
-            </svg>
-          </div>
-          <div class="compare-line"></div>
-          <div class="compare-handle">‹›</div>
-          <div class="canvas-ui">
-            <div class="canvas-top"><span class="pill">RAW</span><span class="pill orange" id="profileBadge">PORTRA</span></div>
-            <div class="canvas-bottom">
-              <span class="canvas-note">拖动 · 查看原片</span>
-              <span class="canvas-note" id="dimensionsBadge">9504 × 6336</span>
-            </div>
+      <main class="workspace">
+        <section class="photo" id="photo">
+          <div class="image-box" id="imageBox">
+            <img id="editedPhoto" src="GRAIN-demo.jpg" alt="Sony ZV-E10 照片">
+            <img id="originalPhoto" class="original" src="GRAIN-demo.jpg" alt="原始照片">
+            <div class="photo-top"><span class="pill">RAW · ZV-E10</span><span class="spinner"></span></div>
+            <div class="photo-bottom"><span class="pill" id="profilePill">Portra 400</span><span class="pill" id="holdOriginal">按住看原片</span></div>
           </div>
         </section>
 
-        <div class="metadata">
-          <div class="meta"><strong id="cameraMeta">SONY A7R V</strong><span>相机</span></div>
-          <div class="sep"></div>
-          <div class="meta"><strong id="mpMeta">61.0 MP</strong><span>原始尺寸</span></div>
-          <div class="sep"></div>
-          <div class="meta"><strong id="sizeMeta">ARW / DEMO</strong><span>源文件</span></div>
-        </div>
+        <section class="filmbar">
+          <div class="section-head"><b>FILM</b><span id="filmName">Portra 400</span><button id="reset">↺</button></div>
+          <div class="films" id="films">
+            <button class="film" data-profile="neutral"><span class="swatch" style="background:linear-gradient(135deg,#8b8d8a,#b7b3a9,#dfd8cb)">NEUTRAL</span><span class="name">RAW Neutral</span></button>
+            <button class="film active" data-profile="portra"><span class="swatch" style="background:linear-gradient(135deg,#b86f58,#d6aa86,#eadcc7)">PORTRA</span><span class="name">Portra 400</span></button>
+            <button class="film" data-profile="pro400h"><span class="swatch" style="background:linear-gradient(135deg,#5f7f79,#aabdb0,#dddcc7)">400H</span><span class="name">Pro 400H</span></button>
+            <button class="film" data-profile="gold"><span class="swatch" style="background:linear-gradient(135deg,#a84a31,#d79d54,#e9d3a2)">GOLD</span><span class="name">Gold 200</span></button>
+            <button class="film" data-profile="chrome"><span class="swatch" style="background:linear-gradient(135deg,#344a49,#7f8b82,#b9b5a7)">CHROME</span><span class="name">Classic Chrome</span></button>
+            <button class="film" data-profile="cinestill"><span class="swatch" style="background:linear-gradient(135deg,#2d5568,#b44e42,#d8b4a1)">800T</span><span class="name">CineStill 800T</span></button>
+            <button class="film" data-profile="hp5"><span class="swatch" style="background:linear-gradient(135deg,#2a2a28,#84817a,#d6d0c4)">HP5</span><span class="name">HP5 Plus</span></button>
+          </div>
+        </section>
 
-        <div class="eyebrow"><b>01</b><span>FILM RECIPE</span><div class="rule"></div><em id="profileName">Portra 400</em></div>
-        <div class="film-strip" id="filmStrip">
-          <button class="film" data-profile="neutral" type="button">
-            <div class="swatch" style="background:linear-gradient(135deg,#8b8d8a,#b7b3a9,#dfd8cb)">NEUTRAL</div><div class="name">RAW Neutral</div>
-          </button>
-          <button class="film active" data-profile="portra" type="button">
-            <div class="swatch" style="background:linear-gradient(135deg,#b86f58,#d6aa86,#eadcc7)">PORTRA</div><div class="name">Portra 400</div>
-          </button>
-          <button class="film" data-profile="pro400h" type="button">
-            <div class="swatch" style="background:linear-gradient(135deg,#5f7f79,#aabdb0,#ddddc7)">400H</div><div class="name">Pro 400H</div>
-          </button>
-          <button class="film" data-profile="gold" type="button">
-            <div class="swatch" style="background:linear-gradient(135deg,#a84a31,#d79d54,#e9d3a2)">GOLD</div><div class="name">Gold 200</div>
-          </button>
-          <button class="film" data-profile="chrome" type="button">
-            <div class="swatch" style="background:linear-gradient(135deg,#344a49,#7f8b82,#b9b5a7)">CHROME</div><div class="name">Classic Chrome</div>
-          </button>
-          <button class="film" data-profile="cinestill" type="button">
-            <div class="swatch" style="background:linear-gradient(135deg,#2d5568,#b44e42,#d8b4a1)">800T</div><div class="name">CineStill 800T</div>
-          </button>
-          <button class="film" data-profile="hp5" type="button">
-            <div class="swatch" style="background:linear-gradient(135deg,#2a2a28,#84817a,#d6d0c4)">HP5</div><div class="name">HP5 Plus</div>
-          </button>
-        </div>
-
-        <div class="eyebrow"><b>02</b><span>FINE TUNE</span><div class="rule"></div></div>
         <section class="controls">
-          <div class="control"><i>◐</i><label>强度</label><input id="intensity" type="range" min="0" max="100" value="82"><output id="intensityOut">82</output></div>
-          <div class="control"><i>☼</i><label>曝光</label><input id="exposure" type="range" min="-200" max="200" value="12"><output id="exposureOut">+0.1</output></div>
-          <div class="control"><i>◉</i><label>色温</label><input id="temp" type="range" min="3500" max="9000" value="6900"><output id="tempOut">6900K</output></div>
-          <div class="control"><i>∴</i><label>颗粒</label><input id="grain" type="range" min="0" max="60" value="18"><output id="grainOut">18</output></div>
-          <div class="control-footer"><span id="profileHint">奶油高光 · 柔和肤色</span><button id="resetButton" type="button">恢复配方</button></div>
+          <div class="tools">
+            <button class="tool active" data-tool="intensity">强度</button>
+            <button class="tool" data-tool="exposure">曝光</button>
+            <button class="tool" data-tool="temperature">色温</button>
+            <button class="tool" data-tool="grain">颗粒</button>
+          </div>
+          <div class="slider-row"><input id="slider" type="range" min="0" max="100" value="82"><output id="value">82</output></div>
         </section>
-        <p class="disclaimer">预览为屏幕尺寸；iOS 工程导出时始终回到 RAW 的原始像素。网页原型用于视觉与交互验收，不执行 Sony ARW 解码。</p>
       </main>
-
-      <nav class="dock">
-        <button class="active" data-tab="develop" type="button"><span class="ico">☷</span>编辑</button>
-        <button data-tab="looks" type="button"><span class="ico">⬡</span>胶片</button>
-        <button data-tab="export" type="button"><span class="ico">↗</span>导出</button>
-      </nav>
     </div>
 
-    <div class="sheet-backdrop" id="sheetBackdrop"></div>
-    <section class="sheet" id="exportSheet" aria-label="导出设置">
-      <div class="grabber"></div>
-      <div class="sheet-head">
-        <div>
-          <h2>最高规格</h2>
-          <div class="sheet-sub">默认锁定原始尺寸，以最高质量写入新文件，不覆盖 RAW。</div>
-        </div>
-        <button class="close" id="closeSheet" type="button">✕</button>
-      </div>
-      <div class="spec-card">
-        <div class="spec"><div class="icon">⤢</div><div class="info"><span>输出尺寸</span><strong id="exportDims">原始像素</strong></div><em>ORIGINAL</em></div>
-        <div class="spec"><div class="icon">◉</div><div class="info"><span>源文件</span><strong id="exportCamera">等待导入 RAW</strong></div><em id="exportSize">—</em></div>
-        <div class="spec"><div class="icon">⬡</div><div class="info"><span>当前配方</span><strong id="exportProfile">Portra 400</strong></div><em id="exportStrength">82%</em></div>
-      </div>
-      <div class="eyebrow"><b>01</b><span>FILE FORMAT</span><div class="rule"></div><em>质量 100%</em></div>
-      <div class="format-row">
-        <button class="format active" data-format="heic" type="button"><strong>HEIC</strong><span>高画质 · 更小体积</span></button>
-        <button class="format" data-format="jpeg" type="button"><strong>JPEG</strong><span>兼容性最佳</span></button>
-      </div>
-      <div class="eyebrow"><b>02</b><span>METADATA</span><div class="rule"></div></div>
-      <div class="toggle-card">
-        <div class="toggle-row"><div class="icon">◎</div><div class="info"><strong>保留相机信息</strong><span>机身、镜头、快门与拍摄时间</span></div><label class="toggle"><input id="cameraToggle" type="checkbox" checked><i></i></label></div>
-        <div class="toggle-row"><div class="icon">⌖</div><div class="info"><strong>保留地址信息</strong><span id="locationHint">经纬度将写入导出文件</span></div><label class="toggle"><input id="locationToggle" type="checkbox" checked><i></i></label></div>
-      </div>
-      <button class="export-btn" id="exportButton" type="button"><span>↗</span><span id="exportButtonText">导出最高规格</span><span id="exportFormatLabel">HEIC</span></button>
-      <p class="privacy-note">关闭地址信息后，GPS 字段会从新文件元数据中移除。导出不会覆盖原始 RAW。</p>
+    <div class="overlay" id="overlay"></div>
+    <section class="sheet" id="exportSheet">
+      <div class="grab"></div>
+      <div class="sheet-title"><div><h2>导出</h2><p>原始尺寸 · 最高质量</p></div><button class="close" id="closeExport">✕</button></div>
+      <div class="facts"><div class="fact"><strong id="dims">2172 × 1448</strong><span>输出像素</span></div><div class="sep"></div><div class="fact"><strong id="exportFilm">PORTRA</strong><span>胶片</span></div><div class="sep"></div><div class="fact"><strong id="formatFact">HEIC</strong><span>格式</span></div></div>
+      <div class="formats"><button class="format active" data-format="heic"><strong>HEIC</strong><span>高画质 · 更小体积</span></button><button class="format" data-format="jpeg"><strong>JPEG</strong><span>兼容性最佳</span></button></div>
+      <div class="toggle-row"><div><strong>保留相机信息</strong><small>机身、镜头、快门与拍摄时间</small></div><label class="switch"><input type="checkbox" checked><i></i></label></div>
+      <div class="toggle-row"><div><strong>保留地址信息</strong><small>GPS 将写入导出文件</small></div><label class="switch"><input type="checkbox" checked><i></i></label></div>
+      <button class="export-btn">↗ 导出原始尺寸 <small>HEIC</small></button>
     </section>
-
-    <div class="toast" id="toast">已完成</div>
+    <div class="home-indicator"></div>
   </div>
 
   <script>
-    const profiles = {
-      neutral: { name:'RAW Neutral', badge:'NEUTRAL', filter:'saturate(1) contrast(1.01) brightness(1)', tint:'rgba(0,0,0,0)', hint:'忠实还原传感器色彩', strength:1 },
-      portra: { name:'Portra 400', badge:'PORTRA', filter:'saturate(.88) contrast(.94) sepia(.08) brightness(1.035)', tint:'rgba(196,128,82,.04)', hint:'奶油高光 · 柔和肤色', strength:.82 },
-      pro400h: { name:'Pro 400H', badge:'400H', filter:'saturate(.78) contrast(.91) sepia(.025) brightness(1.055)', tint:'rgba(106,148,135,.07)', hint:'薄荷青绿 · 空气感', strength:.82 },
-      gold: { name:'Gold 200', badge:'GOLD', filter:'saturate(1.14) contrast(1.06) sepia(.16) brightness(1.01)', tint:'rgba(198,128,42,.08)', hint:'金色午后 · 饱满暖调', strength:.82 },
-      chrome: { name:'Classic Chrome', badge:'CHROME', filter:'saturate(.61) contrast(1.14) sepia(.02) brightness(.99)', tint:'rgba(36,100,98,.08)', hint:'低饱和 · 深青阴影', strength:.82 },
-      cinestill: { name:'CineStill 800T', badge:'800T', filter:'saturate(.96) contrast(.97) hue-rotate(6deg) brightness(1.02)', tint:'rgba(36,106,128,.11)', hint:'钨丝蓝 · 夜景红晕', strength:.82 },
-      hp5: { name:'HP5 Plus', badge:'HP5', filter:'grayscale(1) contrast(1.17) brightness(.98)', tint:'rgba(130,115,92,.09)', hint:'银盐灰阶 · 粗粝颗粒', strength:.82 }
+    const profiles={
+      neutral:{name:'RAW Neutral',badge:'NEUTRAL',filter:'none',range:[0,100],value:100},
+      portra:{name:'Portra 400',badge:'PORTRA',filter:'saturate(.88) contrast(.94) sepia(.08) brightness(1.035)',range:[0,100],value:82},
+      pro400h:{name:'Pro 400H',badge:'400H',filter:'saturate(.78) contrast(.91) sepia(.025) brightness(1.055)',range:[0,100],value:82},
+      gold:{name:'Gold 200',badge:'GOLD',filter:'saturate(1.14) contrast(1.06) sepia(.16) brightness(1.01)',range:[0,100],value:82},
+      chrome:{name:'Classic Chrome',badge:'CHROME',filter:'saturate(.61) contrast(1.14) sepia(.02) brightness(.99)',range:[0,100],value:82},
+      cinestill:{name:'CineStill 800T',badge:'800T',filter:'saturate(.96) contrast(.97) hue-rotate(6deg) brightness(1.02)',range:[0,100],value:82},
+      hp5:{name:'HP5 Plus',badge:'HP5',filter:'grayscale(1) contrast(1.17) brightness(.98)',range:[0,100],value:82}
     };
-
-    const state = {
-      profile:'portra',
-      format:'heic',
-      importedFile:null,
-      split:44,
-      dims:'9504 × 6336',
-      camera:'SONY A7R V',
-      size:'ARW / DEMO',
-      mp:'61.0 MP'
+    let activeProfile='portra',activeTool='intensity';
+    const sliders={
+      intensity:[0,100,82,''],
+      exposure:[-200,200,12,'EV'],
+      temperature:[3500,9000,6900,'K'],
+      grain:[0,60,18,'']
     };
-
-    const $ = s => document.querySelector(s);
-    const phone = $('#phone');
-    const editedLayer = $('#editedLayer');
-    const originalLayer = $('#originalLayer');
-    const canvas = $('#canvas');
-    const sheet = $('#exportSheet');
-
-    function tickClock(){
-      const d = new Date();
-      $('#clock').textContent = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const $=s=>document.querySelector(s), photo=$('#photo');
+    function setFill(el){const p=(+el.value-+el.min)/(+el.max-+el.min)*100;el.style.setProperty('--p',p+'%')}
+    function choose(key){
+      activeProfile=key;const p=profiles[key];
+      document.documentElement.style.setProperty('--filter',p.filter);
+      $('#filmName').textContent=p.name;$('#profilePill').textContent=p.name;$('#exportFilm').textContent=p.badge;
+      document.querySelectorAll('.film').forEach(x=>x.classList.toggle('active',x.dataset.profile===key));
+      photo.classList.add('loading');setTimeout(()=>photo.classList.remove('loading'),180);
     }
-    tickClock();
-    setInterval(tickClock, 30000);
-
-    function setRangeFill(el){
-      const p = (Number(el.value) - Number(el.min)) / (Number(el.max) - Number(el.min)) * 100;
-      el.style.setProperty('--p', `${p}%`);
-    }
-    document.querySelectorAll('input[type=range]').forEach(setRangeFill);
-
-    function selectProfile(key){
-      state.profile = key;
-      const p = profiles[key];
-      document.documentElement.style.setProperty('--filter', p.filter);
-      document.documentElement.style.setProperty('--tint', p.tint);
-      $('#profileName').textContent = p.name;
-      $('#profileBadge').textContent = p.badge;
-      $('#profileHint').textContent = p.hint;
-      $('#exportProfile').textContent = p.name;
-      document.querySelectorAll('.film').forEach(el => el.classList.toggle('active', el.dataset.profile === key));
-      $('#intensity').value = Math.round(p.strength * 100);
-      setRangeFill($('#intensity'));
-      $('#intensityOut').textContent = $('#intensity').value;
-      $('#exportStrength').textContent = `${$('#intensity').value}%`;
-    }
-
-    document.querySelectorAll('.film').forEach(button => {
-      button.addEventListener('click', () => selectProfile(button.dataset.profile));
+    document.querySelectorAll('.film').forEach(b=>b.onclick=()=>choose(b.dataset.profile));
+    document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{
+      activeTool=b.dataset.tool;document.querySelectorAll('.tool').forEach(x=>x.classList.toggle('active',x===b));
+      const s=sliders[activeTool],slider=$('#slider');slider.min=s[0];slider.max=s[1];slider.value=s[2];setFill(slider);updateValue();
     });
-
-    function updateFromRange(el){
-      setRangeFill(el);
-      const id = el.id;
-      if (id === 'intensity') {
-        $('#intensityOut').textContent = el.value;
-        $('#exportStrength').textContent = `${el.value}%`;
-      }
-      if (id === 'exposure') {
-        const val = Number(el.value) / 100;
-        $('#exposureOut').textContent = `${val >= 0 ? '+' : ''}${val.toFixed(1)}`;
-        editedLayer.style.filter = `${profiles[state.profile].filter} brightness(${1 + val / 5})`;
-      }
-      if (id === 'temp') {
-        $('#tempOut').textContent = `${el.value}K`;
-        const warm = Math.max(0, (Number(el.value) - 6500) / 2500);
-        editedLayer.style.filter = `${profiles[state.profile].filter} sepia(${Math.min(warm, .22)})`;
-      }
-      if (id === 'grain') $('#grainOut').textContent = el.value;
+    function updateValue(){
+      const s=sliders[activeTool],v=+$('#slider').value;
+      if(activeTool==='exposure')$('#value').textContent=(v>=0?'+':'')+(v/100).toFixed(1);
+      else if(activeTool==='temperature')$('#value').textContent=v+'K';
+      else $('#value').textContent=v;
     }
-    document.querySelectorAll('input[type=range]').forEach(el => el.addEventListener('input', () => updateFromRange(el)));
-
-    $('#resetButton').addEventListener('click', () => {
-      selectProfile(state.profile);
-      $('#exposure').value = 12;
-      $('#temp').value = 6900;
-      $('#grain').value = 18;
-      ['#exposure','#temp','#grain'].forEach(selector => {
-        const el = $(selector);
-        setRangeFill(el);
-        updateFromRange(el);
-      });
-      editedLayer.style.filter = profiles[state.profile].filter;
-      showToast('配方已恢复');
-    });
-
-    let compareDrag = false;
-    function moveSplit(clientX){
-      const rect = canvas.getBoundingClientRect();
-      state.split = Math.max(8, Math.min(92, (clientX - rect.left) / rect.width * 100));
-      canvas.style.setProperty('--split', `${state.split}%`);
-    }
-    canvas.addEventListener('pointerdown', event => {
-      compareDrag = true;
-      canvas.setPointerCapture?.(event.pointerId);
-      moveSplit(event.clientX);
-    });
-    canvas.addEventListener('pointermove', event => { if (compareDrag) moveSplit(event.clientX); });
-    canvas.addEventListener('pointerup', () => { compareDrag = false; });
-    canvas.addEventListener('pointercancel', () => { compareDrag = false; });
-
-    $('#importButton').addEventListener('click', () => $('#fileInput').click());
-    $('#fileInput').addEventListener('change', event => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      state.importedFile = file;
-      const ext = file.name.split('.').pop().toUpperCase();
-      state.size = ext === 'ARW' ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`;
-      $('#sizeMeta').textContent = state.size;
-      $('#exportSize').textContent = state.size;
-      $('#exportCamera').textContent = ext === 'ARW' ? 'Sony RAW · 原型预览受限' : file.name;
-      $('#photoTitle').textContent = file.name.replace(/\.[^.]+$/, '');
-      $('#frameNo').textContent = `${ext} 01`;
-
-      if (file.type.startsWith('image/') && ext !== 'ARW') {
-        const url = URL.createObjectURL(file);
-        const image = new Image();
-        image.onload = () => {
-          state.dims = `${image.naturalWidth} × ${image.naturalHeight}`;
-          state.mp = `${(image.naturalWidth * image.naturalHeight / 1e6).toFixed(1)} MP`;
-          $('#dimensionsBadge').textContent = state.dims;
-          $('#exportDims').textContent = state.dims;
-          $('#mpMeta').textContent = state.mp;
-          editedLayer.innerHTML = '';
-          originalLayer.innerHTML = '';
-          const e = image.cloneNode(); e.src = url; editedLayer.appendChild(e);
-          const o = image.cloneNode(); o.src = url; originalLayer.appendChild(o);
-          showToast('已载入图像预览');
-        };
-      } else {
-        $('#dimensionsBadge').textContent = 'RAW 原始像素';
-        $('#exportDims').textContent = '由 iOS RAW 管线读取';
-        $('#mpMeta').textContent = 'RAW';
-        showToast('浏览器原型不能解码 ARW；请使用 Xcode 工程');
-      }
-    });
-
-    function openSheet(){
-      phone.classList.add('sheet-open');
-      $('#exportDims').textContent = state.dims;
-    }
-    function closeSheet(){ phone.classList.remove('sheet-open'); }
-    document.querySelectorAll('.dock button').forEach(btn => btn.addEventListener('click', () => {
-      document.querySelectorAll('.dock button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      if (btn.dataset.tab === 'export') openSheet();
-      if (btn.dataset.tab === 'looks') {
-        $('#main').scrollTo({top: $('#filmStrip').offsetTop - 80, behavior:'smooth'});
-      }
-      if (btn.dataset.tab === 'develop') $('#main').scrollTo({top:0, behavior:'smooth'});
-    }));
-    $('#closeSheet').addEventListener('click', closeSheet);
-    $('#sheetBackdrop').addEventListener('click', closeSheet);
-    document.querySelectorAll('.format').forEach(btn => btn.addEventListener('click', () => {
-      state.format = btn.dataset.format;
-      document.querySelectorAll('.format').forEach(b => b.classList.toggle('active', b === btn));
-      $('#exportFormatLabel').textContent = state.format.toUpperCase();
-    }));
-
-    $('#locationToggle').addEventListener('change', e => {
-      $('#locationHint').textContent = e.target.checked ? '经纬度将写入导出文件' : 'GPS 字段将从导出文件中移除';
-    });
-
-    function serializeActiveVisual(){
-      const visual = editedLayer.querySelector('svg,img');
-      if (!visual) return null;
-      if (visual.tagName.toLowerCase() === 'img') return visual.src;
-      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(visual));
-    }
-
-    async function exportImage(){
-      const source = serializeActiveVisual();
-      if (!source) return showToast('请先导入图像');
-      const button = $('#exportButton');
-      button.disabled = true;
-      $('#exportButtonText').textContent = '正在渲染原尺寸…';
-      try {
-        const image = await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = reject;
-          img.src = source;
-        });
-        let width = state.importedFile && !state.importedFile.name.toLowerCase().endsWith('.arw') ? image.naturalWidth : 1200;
-        let height = state.importedFile && !state.importedFile.name.toLowerCase().endsWith('.arw') ? image.naturalHeight : 1500;
-        const scale = Math.min(1, 4096 / Math.max(width, height));
-        width = Math.round(width * scale); height = Math.round(height * scale);
-        const out = document.createElement('canvas');
-        out.width = width; out.height = height;
-        const ctx = out.getContext('2d');
-        ctx.filter = getComputedStyle(editedLayer).filter;
-        ctx.drawImage(image, 0, 0, width, height);
-        const grain = Number($('#grain').value) / 100;
-        if (grain > 0) {
-          const data = ctx.getImageData(0,0,width,height);
-          for (let i=0;i<data.data.length;i+=4){
-            const n = (Math.random()-.5) * grain * 24;
-            data.data[i]=Math.max(0,Math.min(255,data.data[i]+n));
-            data.data[i+1]=Math.max(0,Math.min(255,data.data[i+1]+n));
-            data.data[i+2]=Math.max(0,Math.min(255,data.data[i+2]+n));
-          }
-          ctx.putImageData(data,0,0);
-        }
-        const mime = state.format === 'jpeg' ? 'image/jpeg' : 'image/png';
-        const ext = state.format === 'jpeg' ? 'jpg' : 'png';
-        out.toBlob(blob => {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = `GRAIN-${state.profile}-${width}x${height}.${ext}`;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-          closeSheet();
-          showToast(`已导出 ${width} × ${height} · ${state.format === 'jpeg' ? 'JPEG' : 'PNG 演示格式'}`);
-        }, mime, 1);
-      } catch (error) {
-        showToast('渲染失败，请尝试 JPEG 图像');
-      } finally {
-        button.disabled = false;
-        $('#exportButtonText').textContent = '导出最高规格';
-      }
-    }
-    $('#exportButton').addEventListener('click', exportImage);
-
-    let toastTimer;
-    function showToast(message){
-      const toast = $('#toast');
-      toast.textContent = message;
-      toast.classList.add('show');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
-    }
-
-    selectProfile('portra');
+    $('#slider').oninput=()=>{setFill($('#slider'));updateValue();sliders[activeTool][2]=+$('#slider').value;photo.classList.add('loading');setTimeout(()=>photo.classList.remove('loading'),100)};
+    $('#holdOriginal').addEventListener('pointerdown',()=>{photo.classList.add('holding')});
+    ['pointerup','pointercancel','pointerleave'].forEach(e=>$('#holdOriginal').addEventListener(e,()=>photo.classList.remove('holding')));
+    $('#reset').onclick=()=>choose(activeProfile);
+    $('#openExport').onclick=()=>$('#phone').classList.add('sheet-open');
+    $('#closeExport').onclick=$('#overlay').onclick=()=>$('#phone').classList.remove('sheet-open');
+    document.querySelectorAll('.format').forEach(b=>b.onclick=()=>{document.querySelectorAll('.format').forEach(x=>x.classList.toggle('active',x===b));const t=b.querySelector('strong').textContent;$('#formatFact').textContent=t;document.querySelector('.export-btn small').textContent=t});
+    $('#importButton').onclick=()=>$('#fileInput').click();
+    $('#fileInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const ext=f.name.split('.').pop().toUpperCase();if(ext==='ARW'){alert('浏览器原型不能解码 ARW；请使用 iOS 1.1 测试版。');return}const url=URL.createObjectURL(f);$('#editedPhoto').src=url;$('#originalPhoto').src=url;const i=new Image();i.onload=()=>{$('#dims').textContent=i.naturalWidth+' × '+i.naturalHeight};i.src=url};
+    setFill($('#slider'));updateValue();
   </script>
 </body>
 </html>

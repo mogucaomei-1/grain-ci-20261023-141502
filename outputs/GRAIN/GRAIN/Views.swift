@@ -1,70 +1,43 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum GrainTab: String, CaseIterable {
-    case develop
-    case looks
-    case export
-
-    var title: String {
-        switch self {
-        case .develop: "编辑"
-        case .looks: "胶片"
-        case .export: "导出"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .develop: "slider.horizontal.3"
-        case .looks: "circle.hexagongrid"
-        case .export: "arrow.up.right"
-        }
-    }
-}
-
 struct RootView: View {
     @EnvironmentObject private var editor: EditorViewModel
-    @State private var selectedTab: GrainTab = .develop
     @State private var showImportSource = false
     @State private var showPhotoPicker = false
     @State private var showFileImporter = false
+    @State private var showExportSheet = false
 
     var body: some View {
         ZStack {
             GrainBackground()
-            VStack(spacing: 0) {
-                EditorialHeader {
-                    showImportSource = true
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 6)
-                .padding(.bottom, 14)
 
-                Group {
-                    switch selectedTab {
-                    case .develop:
-                        DevelopView()
-                    case .looks:
-                        LooksView {
-                            selectedTab = .develop
-                        }
-                    case .export:
-                        ExportView()
+            VStack(spacing: 0) {
+                MinimalTopBar(
+                    hasPhoto: editor.photo != nil,
+                    onImport: { showImportSource = true },
+                    onExport: {
+                        editor.exportResult = nil
+                        showExportSheet = true
                     }
+                )
+
+                if editor.photo == nil {
+                    EmptyImportView(
+                        onOpenFiles: { showFileImporter = true },
+                        onOpenPhotos: { showPhotoPicker = true }
+                    )
+                } else {
+                    EditorWorkspace()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            GrainTabBar(selected: $selectedTab)
-        }
-        .confirmationDialog("导入 RAW", isPresented: $showImportSource, titleVisibility: .visible) {
-            Button("从照片图库导入") { showPhotoPicker = true }
-            Button("从文件导入") { showFileImporter = true }
+        .confirmationDialog("导入照片", isPresented: $showImportSource, titleVisibility: .visible) {
+            Button("从文件选择 Sony RAW") { showFileImporter = true }
+            Button("从照片图库选择") { showPhotoPicker = true }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("支持 Sony ARW，也可导入 HEIC、JPEG、DNG。")
+            Text("需要原始 ARW 请优先从“文件”导入，以避免照片图库返回 JPEG 副本。")
         }
         .fullScreenCover(isPresented: $showPhotoPicker) {
             PhotosRawImporter { url in
@@ -77,7 +50,7 @@ struct RootView: View {
         }
         .fileImporter(
             isPresented: $showFileImporter,
-            allowedContentTypes: [.rawImage, .image],
+            allowedContentTypes: supportedImportTypes,
             allowsMultipleSelection: false
         ) { result in
             switch result {
@@ -89,11 +62,14 @@ struct RootView: View {
                 editor.errorMessage = error.localizedDescription
             }
         }
-        .sheet(item: $editor.exportResult) { result in
-            ExportResultSheet(result: result)
+        .sheet(isPresented: $showExportSheet) {
+            ExportSettingsSheet()
+                .environmentObject(editor)
+                .presentationDetents([.height(470)])
+                .presentationDragIndicator(.visible)
         }
         .alert(
-            "处理没有完成",
+            "无法打开照片",
             isPresented: Binding(
                 get: { editor.errorMessage != nil },
                 set: { if !$0 { editor.errorMessage = nil } }
@@ -104,374 +80,288 @@ struct RootView: View {
             Text(editor.errorMessage ?? "")
         }
     }
-}
 
-private struct GrainTabBar: View {
-    @Binding var selected: GrainTab
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(GrainTab.allCases, id: \.self) { tab in
-                Button {
-                    withAnimation(.snappy(duration: 0.24)) {
-                        selected = tab
-                    }
-                } label: {
-                    HStack(spacing: 7) {
-                        Image(systemName: tab.symbol)
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(tab.title)
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundStyle(selected == tab ? GrainTheme.ink : GrainTheme.paperMuted)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .background(
-                        selected == tab ? GrainTheme.paper : Color.clear,
-                        in: Capsule()
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(5)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.7)
-        }
-        .padding(.horizontal, 26)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
+    private var supportedImportTypes: [UTType] {
+        let extensions = ["arw", "srf", "sr2", "dng"]
+        let vendorTypes = extensions.compactMap { UTType(filenameExtension: $0) }
+        return [.rawImage, .image] + vendorTypes
     }
 }
 
-private struct DevelopView: View {
-    @EnvironmentObject private var editor: EditorViewModel
+private struct MinimalTopBar: View {
+    let hasPhoto: Bool
+    let onImport: () -> Void
+    let onExport: () -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                titleBlock
-                EditorCanvas()
-
-                HStack(spacing: 0) {
-                    metadataCell(
-                        value: editor.photo?.cameraLabel ?? "SONY A7R V",
-                        label: "相机"
-                    )
-                    metadataDivider
-                    metadataCell(
-                        value: editor.photo?.megapixelsLabel ?? "61.0 MP",
-                        label: "原始尺寸"
-                    )
-                    metadataDivider
-                    metadataCell(
-                        value: editor.photo?.fileSizeLabel ?? "ARW / DEMO",
-                        label: "源文件"
-                    )
+        HStack(spacing: 12) {
+            HStack(spacing: 9) {
+                ZStack {
+                    Circle().fill(GrainTheme.paper)
+                    Circle()
+                        .trim(from: 0.05, to: 0.52)
+                        .stroke(GrainTheme.black, style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
+                        .rotationEffect(.degrees(-34))
+                        .padding(6)
+                    Circle()
+                        .fill(GrainTheme.accent)
+                        .frame(width: 5, height: 5)
+                        .offset(x: 6, y: -5)
                 }
-                .padding(.vertical, 12)
-                .background(GrainTheme.panel, in: RoundedRectangle(cornerRadius: 16))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(GrainTheme.line, lineWidth: 0.7)
+                .frame(width: 29, height: 29)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("GRAIN")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .tracking(2.1)
+                    Text("RAW FILM LAB  1.1")
+                        .font(.system(size: 6.5, weight: .semibold, design: .monospaced))
+                        .tracking(1.3)
+                        .foregroundStyle(GrainTheme.muted)
                 }
-
-                SectionEyebrow(index: "01", title: "Film Recipe", trailing: editor.selectedProfile.name)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(FilmProfile.allCases) { profile in
-                            Button {
-                                editor.selectProfile(profile)
-                            } label: {
-                                FilmSwatch(
-                                    profile: profile,
-                                    selected: editor.selectedProfile == profile
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-                .contentMargins(.horizontal, 0, for: .scrollContent)
-
-                VStack(spacing: 4) {
-                    SectionEyebrow(index: "02", title: "Fine Tune")
-
-                    ParameterSlider(
-                        label: "强度",
-                        symbol: "circle.lefthalf.filled",
-                        valueText: "\(Int(editor.intensity * 100))",
-                        value: Binding(
-                            get: { editor.intensity * 100 },
-                            set: { editor.intensity = $0 / 100 }
-                        ),
-                        range: 0...100,
-                        onChange: editor.schedulePreview
-                    )
-
-                    ParameterSlider(
-                        label: "曝光",
-                        symbol: "sun.max",
-                        valueText: String(format: "%+.1f", editor.settings.exposure),
-                        value: $editor.settings.exposure,
-                        range: -2...2,
-                        onChange: editor.schedulePreview
-                    )
-
-                    ParameterSlider(
-                        label: "色温",
-                        symbol: "thermometer.medium",
-                        valueText: "\(Int(editor.settings.temperature))K",
-                        value: $editor.settings.temperature,
-                        range: 3500...9000,
-                        onChange: editor.schedulePreview
-                    )
-
-                    ParameterSlider(
-                        label: "颗粒",
-                        symbol: "circle.grid.cross",
-                        valueText: "\(Int(editor.settings.grain * 100))",
-                        value: Binding(
-                            get: { editor.settings.grain * 100 },
-                            set: { editor.settings.grain = $0 / 100 }
-                        ),
-                        range: 0...60,
-                        onChange: editor.schedulePreview
-                    )
-
-                    HStack {
-                        Text(editor.selectedProfile.descriptor)
-                            .font(.system(size: 10, weight: .regular, design: .rounded))
-                            .foregroundStyle(GrainTheme.paperMuted)
-                        Spacer()
-                        Button("恢复配方") {
-                            editor.resetSelectedProfile()
-                        }
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(GrainTheme.accent)
-                    }
-                    .padding(.top, 7)
-                }
-                .padding(14)
-                .background(GrainTheme.panel, in: RoundedRectangle(cornerRadius: 20))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(GrainTheme.line, lineWidth: 0.7)
-                }
-
-                Text("所有调整均作用于 RAW 解码后的高精度管线。预览为屏幕尺寸，导出始终使用原始像素尺寸。")
-                    .font(.system(size: 10, weight: .regular, design: .rounded))
-                    .foregroundStyle(GrainTheme.paperMuted.opacity(0.72))
-                    .lineSpacing(3)
-                    .padding(.horizontal, 2)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 22)
-        }
-        .scrollIndicators(.hidden)
-        .overlay {
-            if editor.isPreparing && editor.photo != nil {
-                VStack(spacing: 10) {
-                    ProgressView()
-                        .tint(GrainTheme.paper)
-                    Text("正在显影")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(GrainTheme.paper)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(.black.opacity(0.72), in: Capsule())
+
+            Spacer()
+
+            Button(action: onImport) {
+                Image(systemName: "photo.badge.plus")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 38, height: 38)
+                    .background(GrainTheme.raised, in: Circle())
             }
+            .buttonStyle(.plain)
+
+            Button(action: onExport) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(hasPhoto ? GrainTheme.black : GrainTheme.muted)
+                    .frame(width: 38, height: 38)
+                    .background(hasPhoto ? GrainTheme.paper : GrainTheme.raised, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasPhoto)
         }
+        .foregroundStyle(GrainTheme.paper)
+        .padding(.horizontal, 18)
+        .frame(height: 54)
     }
+}
 
-    private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(editor.photo?.displayName ?? "暮色之后")
-                    .font(.system(size: 28, weight: .bold, design: .serif))
+private struct EmptyImportView: View {
+    let onOpenFiles: () -> Void
+    let onOpenPhotos: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(GrainTheme.surface)
+                    .frame(width: 116, height: 116)
+                Circle()
+                    .stroke(GrainTheme.line, lineWidth: 1)
+                    .frame(width: 116, height: 116)
+                Image(systemName: "camera.aperture")
+                    .font(.system(size: 35, weight: .light))
                     .foregroundStyle(GrainTheme.paper)
-                    .lineLimit(1)
-                Spacer()
-                Text(editor.photo == nil ? "DEMO FRAME" : "RAW 01")
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundStyle(GrainTheme.accent)
             }
-            Text("把数字底片，洗成时间。")
-                .font(.system(size: 11, weight: .regular, design: .rounded))
-                .foregroundStyle(GrainTheme.paperMuted)
-        }
-    }
+            .padding(.bottom, 24)
 
-    private var metadataDivider: some View {
-        Rectangle()
-            .fill(GrainTheme.line)
-            .frame(width: 1, height: 28)
-    }
-
-    private func metadataCell(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            Text("打开原始照片")
+                .font(.system(size: 27, weight: .bold, design: .serif))
                 .foregroundStyle(GrainTheme.paper)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Text(label)
-                .font(.system(size: 9, weight: .regular, design: .rounded))
-                .foregroundStyle(GrainTheme.paperMuted)
+                .padding(.bottom, 7)
+
+            Text("从“文件”选择 Sony ARW，保留完整 RAW 与元数据")
+                .font(.system(size: 11, weight: .regular, design: .rounded))
+                .foregroundStyle(GrainTheme.muted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 36)
+
+            Button(action: onOpenFiles) {
+                HStack(spacing: 9) {
+                    Image(systemName: "folder")
+                    Text("从文件导入 RAW")
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .foregroundStyle(GrainTheme.black.opacity(0.45))
+                }
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(GrainTheme.black)
+                .padding(.horizontal, 17)
+                .frame(height: 52)
+                .background(GrainTheme.paper, in: RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 34)
+            .padding(.top, 32)
+
+            Button("从照片图库选择", action: onOpenPhotos)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(GrainTheme.muted)
+                .padding(.top, 16)
+
+            Spacer()
+
+            Text("ARW  ·  SRF  ·  SR2  ·  DNG")
+                .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                .tracking(1.8)
+                .foregroundStyle(GrainTheme.muted.opacity(0.55))
+                .padding(.bottom, 24)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-private struct EditorCanvas: View {
+private struct EditorWorkspace: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            PhotoEditorCanvas()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            FilmPresetBar()
+                .frame(height: 100)
+
+            AdjustPanel()
+                .frame(height: 130)
+        }
+    }
+}
+
+private struct PhotoEditorCanvas: View {
     @EnvironmentObject private var editor: EditorViewModel
-    @State private var comparePosition = 0.44
+    @State private var showOriginal = false
 
     var body: some View {
         GeometryReader { proxy in
-            let width = proxy.size.width
-            let height = proxy.size.height
-            let splitX = width * comparePosition
+            let imageHeight = min(proxy.size.height, proxy.size.width / imageAspect)
 
             ZStack {
-                editedImage
-                    .frame(width: width, height: height)
-                    .clipped()
-
-                originalImage
-                    .frame(width: width, height: height)
-                    .clipped()
-                    .frame(width: splitX, alignment: .leading)
-                    .clipped()
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.84))
-                    .frame(width: 1)
-                    .position(x: splitX, y: height / 2)
-                    .shadow(color: .black.opacity(0.35), radius: 4)
+                Color.black
 
                 ZStack {
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                    Circle()
-                        .stroke(Color.white.opacity(0.8), lineWidth: 0.8)
-                    HStack(spacing: 1) {
-                        Image(systemName: "chevron.left")
-                        Image(systemName: "chevron.right")
+                    if showOriginal, let original = editor.originalPreview {
+                        Image(decorative: original, scale: 1)
+                            .resizable()
+                            .scaledToFit()
+                            .transition(.opacity)
+                    } else if let edited = editor.editedPreview {
+                        Image(decorative: edited, scale: 1)
+                            .resizable()
+                            .scaledToFit()
+                            .transition(.opacity)
+                    } else {
+                        ProgressView()
+                            .tint(GrainTheme.paper)
                     }
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
-                }
-                .frame(width: 32, height: 32)
-                .position(x: splitX, y: height / 2)
 
-                VStack {
-                    HStack {
-                        PillLabel(text: "RAW")
+                    VStack {
+                        HStack {
+                            Label("RAW", systemImage: "circle.fill")
+                                .labelStyle(.titleAndIcon)
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .tracking(0.8)
+                                .foregroundStyle(GrainTheme.paper)
+                                .padding(.horizontal, 9)
+                                .frame(height: 24)
+                                .background(.black.opacity(0.52), in: Capsule())
+
+                            Spacer()
+
+                            if editor.isPreparing {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(GrainTheme.paper)
+                                    .padding(8)
+                                    .background(.black.opacity(0.46), in: Circle())
+                            }
+                        }
+
                         Spacer()
-                        PillLabel(text: editor.selectedProfile.shortName, accent: true)
+
+                        HStack(alignment: .bottom) {
+                            Text(showOriginal ? "原片" : editor.selectedProfile.name)
+                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .foregroundStyle(GrainTheme.paper)
+                                .padding(.horizontal, 10)
+                                .frame(height: 27)
+                                .background(.black.opacity(0.48), in: Capsule())
+
+                            Spacer()
+
+                            Text("按住看原片")
+                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .foregroundStyle(GrainTheme.paper)
+                                .padding(.horizontal, 11)
+                                .frame(height: 29)
+                                .background(.black.opacity(0.52), in: Capsule())
+                                .contentShape(Capsule())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { _ in
+                                            withAnimation(.easeOut(duration: 0.12)) {
+                                                showOriginal = true
+                                            }
+                                        }
+                                        .onEnded { _ in
+                                            withAnimation(.easeOut(duration: 0.16)) {
+                                                showOriginal = false
+                                            }
+                                        }
+                                )
+                        }
                     }
-                    Spacer()
-                    HStack {
-                        Text("向左查看原片")
-                        Spacer()
-                        Text(editor.photo?.dimensionsLabel ?? "9504 × 6336")
-                    }
-                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                    .tracking(0.7)
-                    .foregroundStyle(.white.opacity(0.84))
+                    .padding(13)
                 }
-                .padding(12)
+                .frame(width: proxy.size.width, height: imageHeight)
             }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        comparePosition = min(max(value.location.x / width, 0.08), 0.92)
-                    }
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .aspectRatio(displayAspect, contentMode: .fit)
-        .background(GrainTheme.panel)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 0.8)
-                .allowsHitTesting(false)
-        }
-        .shadow(color: .black.opacity(0.28), radius: 28, y: 20)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 
-    private var displayAspect: CGFloat {
-        guard let photo = editor.photo, photo.pixelHeight > 0 else {
-            return 4 / 5
+    private var imageAspect: CGFloat {
+        guard let photo = editor.photo, photo.pixelWidth > 0, photo.pixelHeight > 0 else {
+            return 3 / 2
         }
-        let ratio = CGFloat(photo.pixelWidth) / CGFloat(photo.pixelHeight)
-        return min(max(ratio, 0.62), 1.38)
-    }
-
-    @ViewBuilder
-    private var editedImage: some View {
-        if let image = editor.editedPreview {
-            Image(decorative: image, scale: 1)
-                .resizable()
-                .scaledToFit()
-        } else {
-            DemoArtwork()
-                .saturation(editor.selectedProfile == .hp5 ? 0 : 0.90)
-                .contrast(1.05)
-                .overlay(Color(hex: 0xD59A68).opacity(0.04))
-        }
-    }
-
-    @ViewBuilder
-    private var originalImage: some View {
-        if let image = editor.originalPreview {
-            Image(decorative: image, scale: 1)
-                .resizable()
-                .scaledToFit()
-        } else {
-            DemoArtwork()
-                .saturation(0.25)
-                .contrast(0.94)
-        }
+        return CGFloat(photo.pixelWidth) / CGFloat(photo.pixelHeight)
     }
 }
 
-private struct LooksView: View {
+private struct FilmPresetBar: View {
     @EnvironmentObject private var editor: EditorViewModel
-    let onReturnToEditor: () -> Void
-
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("胶片配方室")
-                        .font(.system(size: 30, weight: .bold, design: .serif))
-                        .foregroundStyle(GrainTheme.paper)
-                    Text("不是滤镜叠加，而是围绕宽容度、色相偏移与银盐颗粒建立的色彩配方。")
-                        .font(.system(size: 11, design: .rounded))
-                        .foregroundStyle(GrainTheme.paperMuted)
-                        .lineSpacing(3)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("FILM")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .tracking(1.5)
+                    .foregroundStyle(GrainTheme.muted)
+                Text(editor.selectedProfile.name)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(GrainTheme.paper)
+                Spacer()
+                Button {
+                    editor.resetSelectedProfile()
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(GrainTheme.muted)
                 }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 18)
 
-                LazyVGrid(columns: columns, spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 5) {
                     ForEach(FilmProfile.allCases) { profile in
                         Button {
                             editor.selectProfile(profile)
-                            onReturnToEditor()
                         } label: {
-                            LookCard(
+                            FilmPresetChip(
                                 profile: profile,
                                 selected: editor.selectedProfile == profile
                             )
@@ -479,163 +369,204 @@ private struct LooksView: View {
                         .buttonStyle(.plain)
                     }
                 }
-
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 13))
-                    Text("配方名称仅用于描述色彩取向，与胶片厂商无隶属或授权关系。")
-                        .font(.system(size: 10, design: .rounded))
-                        .lineSpacing(3)
-                }
-                .foregroundStyle(GrainTheme.paperMuted.opacity(0.78))
-                .padding(.top, 2)
+                .padding(.horizontal, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 28)
         }
-        .scrollIndicators(.hidden)
+        .padding(.top, 8)
     }
 }
 
-private struct LookCard: View {
-    let profile: FilmProfile
-    let selected: Bool
+private enum AdjustTool: String, CaseIterable, Identifiable {
+    case intensity
+    case exposure
+    case temperature
+    case grain
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                LinearGradient(
-                    colors: profile.uiPalette,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                Circle()
-                    .fill(profile.uiPalette.last?.opacity(0.4) ?? .clear)
-                    .frame(width: 72)
-                    .blur(radius: 12)
-                    .offset(x: 40, y: -12)
-                LinearGradient(colors: [.clear, .black.opacity(0.56)], startPoint: .top, endPoint: .bottom)
-                Text(profile.shortName)
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .tracking(1.3)
-                    .foregroundStyle(.white)
-                    .padding(12)
-            }
-            .frame(height: 144)
-            .clipped()
+    var id: String { rawValue }
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Text(profile.name)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(GrainTheme.paper)
-                    Spacer()
-                    if selected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(GrainTheme.accent)
-                    }
-                }
-                Text(profile.descriptor)
-                    .font(.system(size: 9, design: .rounded))
-                    .foregroundStyle(GrainTheme.paperMuted)
-                    .lineLimit(1)
-            }
-            .padding(12)
-        }
-        .background(GrainTheme.panel, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(selected ? GrainTheme.accent : GrainTheme.line, lineWidth: selected ? 1.3 : 0.7)
+    var title: String {
+        switch self {
+        case .intensity: "强度"
+        case .exposure: "曝光"
+        case .temperature: "色温"
+        case .grain: "颗粒"
         }
     }
 }
 
-private struct ExportView: View {
+private struct AdjustPanel: View {
     @EnvironmentObject private var editor: EditorViewModel
+    @State private var selectedTool: AdjustTool = .intensity
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("最高规格")
-                        .font(.system(size: 30, weight: .bold, design: .serif))
-                        .foregroundStyle(GrainTheme.paper)
-                    Text("默认锁定原始尺寸，以最高质量写入新的图片文件，不覆盖 RAW。")
-                        .font(.system(size: 11, design: .rounded))
-                        .foregroundStyle(GrainTheme.paperMuted)
-                        .lineSpacing(3)
+        VStack(spacing: 10) {
+            HStack(spacing: 7) {
+                ForEach(AdjustTool.allCases) { tool in
+                    Button {
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            selectedTool = tool
+                        }
+                    } label: {
+                        Text(tool.title)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(selectedTool == tool ? GrainTheme.black : GrainTheme.muted)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 31)
+                            .background(
+                                selectedTool == tool ? GrainTheme.paper : GrainTheme.surface,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack(spacing: 12) {
+                Slider(value: activeBinding, in: activeRange)
+                    .tint(GrainTheme.accent)
+
+                Text(activeValueText)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(GrainTheme.paper)
+                    .frame(width: 52, alignment: .trailing)
+            }
+            .frame(height: 34)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 9)
+        .padding(.bottom, 18)
+        .background(GrainTheme.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(GrainTheme.line).frame(height: 1)
+        }
+    }
+
+    private var activeRange: ClosedRange<Double> {
+        switch selectedTool {
+        case .intensity: 0...100
+        case .exposure: -2...2
+        case .temperature: 3500...9000
+        case .grain: 0...60
+        }
+    }
+
+    private var activeBinding: Binding<Double> {
+        switch selectedTool {
+        case .intensity:
+            Binding(
+                get: { editor.intensity * 100 },
+                set: {
+                    editor.intensity = $0 / 100
+                    editor.schedulePreview()
+                }
+            )
+        case .exposure:
+            Binding(
+                get: { editor.settings.exposure },
+                set: {
+                    editor.settings.exposure = $0
+                    editor.schedulePreview()
+                }
+            )
+        case .temperature:
+            Binding(
+                get: { editor.settings.temperature },
+                set: {
+                    editor.settings.temperature = $0
+                    editor.schedulePreview()
+                }
+            )
+        case .grain:
+            Binding(
+                get: { editor.settings.grain * 100 },
+                set: {
+                    editor.settings.grain = $0 / 100
+                    editor.schedulePreview()
+                }
+            )
+        }
+    }
+
+    private var activeValueText: String {
+        switch selectedTool {
+        case .intensity:
+            "\(Int(editor.intensity * 100))"
+        case .exposure:
+            String(format: "%+.1f", editor.settings.exposure)
+        case .temperature:
+            "\(Int(editor.settings.temperature))K"
+        case .grain:
+            "\(Int(editor.settings.grain * 100))"
+        }
+    }
+}
+
+private struct ExportSettingsSheet: View {
+    @EnvironmentObject private var editor: EditorViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @ViewBuilder
+    var body: some View {
+        if let result = editor.exportResult {
+            ExportResultSheet(result: result)
+        } else {
+            ZStack {
+                GrainTheme.black.ignoresSafeArea()
+
+                VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("导出")
+                            .font(.system(size: 25, weight: .bold, design: .serif))
+                            .foregroundStyle(GrainTheme.paper)
+                        Text("原始尺寸 · 最高质量")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(GrainTheme.muted)
+                    }
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 30, height: 30)
+                            .background(GrainTheme.raised, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(GrainTheme.paper)
                 }
 
-                VStack(spacing: 0) {
-                    exportSpecRow(
-                        icon: "aspectratio",
-                        label: "输出尺寸",
-                        value: editor.photo?.dimensionsLabel ?? "原始像素",
-                        note: "ORIGINAL"
-                    )
-                    divider
-                    exportSpecRow(
-                        icon: "camera",
-                        label: "源文件",
-                        value: editor.photo.map {
-                            $0.cameraModel.isEmpty ? $0.cameraLabel : $0.cameraModel
-                        } ?? "等待导入 RAW",
-                        note: editor.photo?.fileSizeLabel ?? "—"
-                    )
-                    divider
-                    exportSpecRow(
-                        icon: "circle.hexagongrid",
-                        label: "当前配方",
-                        value: editor.selectedProfile.name,
-                        note: "\(Int(editor.intensity * 100))%"
-                    )
+                HStack(spacing: 0) {
+                    ExportFact(value: editor.photo?.dimensionsLabel ?? "—", label: "像素")
+                    Divider().overlay(GrainTheme.line).frame(height: 30)
+                    ExportFact(value: editor.selectedProfile.shortName, label: "胶片")
+                    Divider().overlay(GrainTheme.line).frame(height: 30)
+                    ExportFact(value: editor.exportOptions.format.title, label: "格式")
                 }
-                .padding(.horizontal, 15)
-                .background(GrainTheme.panel, in: RoundedRectangle(cornerRadius: 20))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(GrainTheme.line, lineWidth: 0.7)
-                }
+                .padding(.vertical, 12)
+                .background(GrainTheme.surface, in: RoundedRectangle(cornerRadius: 16))
 
-                SectionEyebrow(index: "01", title: "File Format", trailing: "质量 100%")
-                HStack(spacing: 10) {
+                HStack(spacing: 9) {
                     ForEach(ExportFormat.allCases) { format in
                         Button {
                             editor.exportOptions.format = format
                         } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text(format.title)
-                                        .font(.system(size: 15, weight: .bold, design: .monospaced))
-                                    Spacer()
-                                    Circle()
-                                        .stroke(GrainTheme.paperMuted, lineWidth: 1)
-                                        .overlay {
-                                            if editor.exportOptions.format == format {
-                                                Circle()
-                                                    .fill(GrainTheme.accent)
-                                                    .padding(3)
-                                            }
-                                        }
-                                        .frame(width: 16, height: 16)
-                                }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(format.title)
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
                                 Text(format.subtitle)
-                                    .font(.system(size: 9, design: .rounded))
-                                    .foregroundStyle(GrainTheme.paperMuted)
+                                    .font(.system(size: 8.5, design: .rounded))
+                                    .foregroundStyle(GrainTheme.muted)
                             }
                             .foregroundStyle(GrainTheme.paper)
-                            .padding(14)
+                            .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(GrainTheme.panelRaised, in: RoundedRectangle(cornerRadius: 16))
+                            .background(GrainTheme.surface, in: RoundedRectangle(cornerRadius: 14))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 16)
+                                RoundedRectangle(cornerRadius: 14)
                                     .stroke(
                                         editor.exportOptions.format == format
-                                            ? GrainTheme.accent.opacity(0.8)
+                                            ? GrainTheme.accent
                                             : GrainTheme.line,
-                                        lineWidth: 0.8
+                                        lineWidth: 1
                                     )
                             }
                         }
@@ -643,125 +574,78 @@ private struct ExportView: View {
                     }
                 }
 
-                SectionEyebrow(index: "02", title: "Metadata")
-                VStack(spacing: 0) {
-                    metadataToggle(
-                        title: "保留相机信息",
-                        subtitle: "机身、镜头、快门与拍摄时间",
-                        isOn: $editor.exportOptions.keepCameraMetadata,
-                        symbol: "camera.aperture"
-                    )
-                    divider
-                    metadataToggle(
-                        title: "保留地址信息",
-                        subtitle: editor.photo?.hasLocation == false
-                            ? "源 RAW 中没有检测到 GPS"
-                            : "经纬度将写入导出文件",
-                        isOn: $editor.exportOptions.keepLocation,
-                        symbol: "location"
-                    )
-                    .disabled(editor.photo?.hasLocation == false)
-                    .opacity(editor.photo?.hasLocation == false ? 0.5 : 1)
+                Toggle(isOn: $editor.exportOptions.keepLocation) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("保留地址信息")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        Text(editor.photo?.hasLocation == true ? "GPS 将写入导出文件" : "源文件未检测到 GPS")
+                            .font(.system(size: 8.5, design: .rounded))
+                            .foregroundStyle(GrainTheme.muted)
+                    }
                 }
-                .padding(.horizontal, 15)
-                .background(GrainTheme.panel, in: RoundedRectangle(cornerRadius: 20))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(GrainTheme.line, lineWidth: 0.7)
+                .tint(GrainTheme.accent)
+                .disabled(editor.photo?.hasLocation != true)
+
+                Toggle(isOn: $editor.exportOptions.keepCameraMetadata) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("保留相机信息")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        Text("机身、镜头、快门与拍摄时间")
+                            .font(.system(size: 8.5, design: .rounded))
+                            .foregroundStyle(GrainTheme.muted)
+                    }
                 }
+                .tint(GrainTheme.accent)
 
                 Button {
                     editor.export()
                 } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 9) {
                         if editor.isExporting {
-                            ProgressView()
-                                .tint(GrainTheme.ink)
+                            ProgressView().tint(GrainTheme.black)
                         } else {
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 13, weight: .bold))
+                            Image(systemName: "arrow.up")
                         }
-                        Text(editor.isExporting ? "正在导出原尺寸…" : "导出最高规格")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                        Text(editor.isExporting ? "正在导出…" : "导出原始尺寸")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
                         Spacer()
                         Text(editor.exportOptions.format.title)
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .foregroundStyle(GrainTheme.ink.opacity(0.56))
+                            .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                            .foregroundStyle(GrainTheme.black.opacity(0.48))
                     }
-                    .foregroundStyle(GrainTheme.ink)
-                    .padding(.horizontal, 18)
-                    .frame(height: 54)
-                    .background(GrainTheme.paper, in: RoundedRectangle(cornerRadius: 17))
+                    .foregroundStyle(GrainTheme.black)
+                    .padding(.horizontal, 16)
+                    .frame(height: 51)
+                    .background(GrainTheme.paper, in: RoundedRectangle(cornerRadius: 15))
                 }
                 .buttonStyle(.plain)
                 .disabled(!editor.canExport)
-                .opacity(editor.canExport ? 1 : 0.4)
+                .opacity(editor.canExport ? 1 : 0.42)
 
-                Text("导出不会覆盖原始 RAW。关闭地址信息后，GPS 字段会从新文件元数据中移除。")
-                    .font(.system(size: 10, design: .rounded))
-                    .foregroundStyle(GrainTheme.paperMuted.opacity(0.72))
-                    .lineSpacing(3)
+                    Spacer(minLength: 0)
+                }
+                .padding(20)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
         }
-        .scrollIndicators(.hidden)
     }
+}
 
-    private var divider: some View {
-        Rectangle()
-            .fill(GrainTheme.line)
-            .frame(height: 1)
-    }
+private struct ExportFact: View {
+    let value: String
+    let label: String
 
-    private func exportSpecRow(icon: String, label: String, value: String, note: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(GrainTheme.accent)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(label)
-                    .font(.system(size: 9, design: .rounded))
-                    .foregroundStyle(GrainTheme.paperMuted)
-                Text(value)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(GrainTheme.paper)
-                    .lineLimit(1)
-            }
-            Spacer()
-            Text(note)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundStyle(GrainTheme.paperMuted)
+    var body: some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(GrainTheme.paper)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Text(label)
+                .font(.system(size: 8, design: .rounded))
+                .foregroundStyle(GrainTheme.muted)
         }
-        .frame(height: 60)
-    }
-
-    private func metadataToggle(
-        title: String,
-        subtitle: String,
-        isOn: Binding<Bool>,
-        symbol: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(GrainTheme.accent)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(GrainTheme.paper)
-                Text(subtitle)
-                    .font(.system(size: 9, design: .rounded))
-                    .foregroundStyle(GrainTheme.paperMuted)
-            }
-            Spacer()
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .tint(GrainTheme.accent)
-        }
-        .frame(height: 64)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -771,70 +655,40 @@ private struct ExportResultSheet: View {
 
     var body: some View {
         ZStack {
-            GrainTheme.ink.ignoresSafeArea()
-            VStack(spacing: 18) {
-                ZStack {
-                    Circle()
-                        .fill(GrainTheme.accent.opacity(0.14))
-                        .frame(width: 72, height: 72)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(GrainTheme.accent)
-                }
+            GrainTheme.black.ignoresSafeArea()
+            VStack(spacing: 17) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(GrainTheme.accent)
+                    .frame(width: 62, height: 62)
+                    .background(GrainTheme.accent.opacity(0.12), in: Circle())
 
-                VStack(spacing: 6) {
-                    Text("显影完成")
-                        .font(.system(size: 26, weight: .bold, design: .serif))
-                        .foregroundStyle(GrainTheme.paper)
-                    Text("已按原始像素尺寸输出最高质量文件")
-                        .font(.system(size: 11, design: .rounded))
-                        .foregroundStyle(GrainTheme.paperMuted)
+                VStack(spacing: 4) {
+                    Text("导出完成")
+                        .font(.system(size: 24, weight: .bold, design: .serif))
+                    Text("\(result.dimensions) · \(result.format.title) · 100%")
+                        .font(.system(size: 9.5, design: .monospaced))
+                        .foregroundStyle(GrainTheme.muted)
                 }
-
-                HStack(spacing: 24) {
-                    resultStat(value: result.dimensions, label: "像素")
-                    resultStat(value: result.format.title, label: "格式")
-                    resultStat(value: "100%", label: "质量")
-                }
-                .padding(18)
-                .background(GrainTheme.panel, in: RoundedRectangle(cornerRadius: 20))
 
                 ShareLink(item: result.url) {
                     HStack {
                         Image(systemName: "square.and.arrow.up")
                         Text("存储或分享")
                         Spacer()
-                        Text(result.format.title)
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .foregroundStyle(GrainTheme.ink.opacity(0.55))
                     }
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(GrainTheme.ink)
-                    .padding(.horizontal, 18)
-                    .frame(height: 52)
-                    .background(GrainTheme.paper, in: RoundedRectangle(cornerRadius: 17))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(GrainTheme.black)
+                    .padding(.horizontal, 17)
+                    .frame(height: 50)
+                    .background(GrainTheme.paper, in: RoundedRectangle(cornerRadius: 15))
                 }
 
-                Button("返回编辑") {
-                    dismiss()
-                }
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(GrainTheme.paperMuted)
+                Button("返回编辑") { dismiss() }
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(GrainTheme.muted)
             }
-            .padding(24)
-        }
-        .presentationDetents([.height(430)])
-        .presentationDragIndicator(.visible)
-    }
-
-    private func resultStat(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(GrainTheme.paper)
-            Text(label)
-                .font(.system(size: 9, design: .rounded))
-                .foregroundStyle(GrainTheme.paperMuted)
+            .padding(22)
         }
     }
 }

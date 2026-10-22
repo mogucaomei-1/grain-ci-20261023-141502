@@ -15,7 +15,7 @@ enum ImageProcessorError: LocalizedError {
         case .cannotOpenFile:
             "无法读取这张照片，请确认文件没有损坏。"
         case .unsupportedRAW:
-            "当前 iOS 版本暂不能解码这个 Sony RAW 版本。请先更新系统，或导入该照片的 JPEG / HEIC 副本。"
+            "当前 iOS 的 RAW 解码器无法读取这个 Sony RAW 版本。请确认选择的是原始 ARW，而不是图库生成的 JPEG 副本；必要时更新 iOS 后重试。"
         case .cannotRender:
             "图像处理没有完成，请重新尝试。"
         case .cannotWrite:
@@ -43,7 +43,7 @@ struct RawImageProcessor {
 
         let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
         let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
-        let rawOrientation = properties[kCGImagePropertyOrientation] as? UInt32 ?? 1
+        let rawOrientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
         let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap(Int64.init) ?? 0
 
         let dateString = exif[kCGImagePropertyExifDateTimeOriginal] as? String
@@ -112,6 +112,12 @@ struct RawImageProcessor {
             let image = try loadImage(from: url, draft: false)
             let normalized = normalizedExtent(of: image)
             let maxDimension = max(normalized.extent.width, normalized.extent.height)
+            let sourceAsset = try metadata(for: url)
+            let expectedLongEdge = max(sourceAsset.pixelWidth, sourceAsset.pixelHeight)
+            if expectedLongEdge > 0, maxDimension < Double(expectedLongEdge) * 0.90 {
+                // Never export an embedded JPEG or a draft-sized image as "full resolution".
+                throw ImageProcessorError.unsupportedRAW
+            }
             let graded = applyFilm(
                 to: normalized,
                 profile: profile,
@@ -204,6 +210,12 @@ struct RawImageProcessor {
             if rawFilter.isSharpnessSupported {
                 rawFilter.sharpnessAmount = 0.24
             }
+            if let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+               let orientationNumber = (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value,
+               let orientation = CGImagePropertyOrientation(rawValue: orientationNumber) {
+                rawFilter.orientation = orientation
+            }
             if let output = rawFilter.outputImage {
                 return output
             }
@@ -213,16 +225,21 @@ struct RawImageProcessor {
         }
 
         let rawExtensions = ["arw", "srf", "sr2", "dng"]
-        if rawExtensions.contains(url.pathExtension.lowercased()) {
-            throw ImageProcessorError.unsupportedRAW
-        }
-
         let fallback = CIImage(
             contentsOf: url,
             options: [.applyOrientationProperty: true]
         )
         guard let fallback else {
             throw ImageProcessorError.unsupportedRAW
+        }
+
+        if rawExtensions.contains(url.pathExtension.lowercased()) {
+            let sourceAsset = try metadata(for: url)
+            let expectedLongEdge = max(sourceAsset.pixelWidth, sourceAsset.pixelHeight)
+            let fallbackLongEdge = max(fallback.extent.width, fallback.extent.height)
+            if expectedLongEdge > 0, fallbackLongEdge < Double(expectedLongEdge) * 0.90 {
+                throw ImageProcessorError.unsupportedRAW
+            }
         }
         return fallback
     }

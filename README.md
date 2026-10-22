@@ -1,4 +1,4 @@
-# GRAIN
+# GRAIN 1.1
 
 iPhone RAW 胶片工作台。应用源码位于 `outputs/GRAIN`，交互原型为 `outputs/GRAIN-prototype.html`。
 
