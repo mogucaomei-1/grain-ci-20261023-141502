@@ -13,15 +13,15 @@ GRAIN 是一个面向 iPhone 的 SwiftUI RAW 调色 App MVP。主流程围绕 So
 
 ## 已实现
 
-- 通过 `CIRAWFilter` 解码 Sony ARW，并以原尺寸校验阻止内嵌 JPEG 被误当 RAW；“文件” App 是原始 RAW 的首选导入路径。
+- 通过 `CIRAWFilter` 解码 Sony ARW，并以原尺寸校验阻止内嵌 JPEG 被误当 RAW；照片图库优先，文件导入使用原生 `UIDocumentPicker` 的 `asCopy` 模式。
 - 预览固定渲染约 1800 px 长边，避免每次拖动参数都解码整张高像素 RAW。
 - 导出时重新从 RAW 读取全尺寸图像，默认保持原始像素，不提供隐式缩小。
 - 默认 HEIC，质量 100%；可切换 JPEG，质量 100%；HEIC 不可用时自动回退 JPEG。
 - 输出 Display P3，保留相机、镜头、拍摄时间等 EXIF/TIFF 字段。
 - “保留地址信息”开关控制 GPS 字典及 IPTC 位置字段，关闭后不会写入导出文件。
 - 七套非破坏性色彩配方：RAW Neutral、Portra 400、Pro 400H、Gold 200、Classic Chrome、CineStill 800T、HP5 Plus。
-- 可调曝光、色温、对比、饱和度、褪色、颗粒、暗角和配方强度。
-- 原片/调色拖动对比、相机与原始像素信息、导出结果分享。
+- 可调曝光、对比、高光、阴影、白色、黑色、色温、色调、自然饱和度、饱和度、清晰度、锐化、褪色、颗粒、暗角和配方强度。
+- 单页实时预览、长按查看原片、返回主页、相机与原始像素信息、导出结果分享。
 
 ## 关键文件
 
