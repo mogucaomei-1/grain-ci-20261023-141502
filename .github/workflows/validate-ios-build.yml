@@ -42,7 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --location --retry 2 \
-            "https://www.rawsamples.ch/raws/sony/RAW_SONY_ILCE-7RM2.ARW" \
+            "https://raw.pixls.us/data/Sony/ZV-E10/DSC00002.ARW" \
             --output ci/raw-smoke-test/sony-sample.arw
 
       - name: Test real Sony ARW decode and full-size export
