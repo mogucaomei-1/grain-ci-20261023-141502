@@ -77,7 +77,14 @@ final class EditorViewModel: ObservableObject {
             }
             schedulePreview()
             isRecommending = false
-            showNotice("推荐：\(recommendation.profile.name) · \(recommendation.reason)")
+            let exposure = String(format: "%+.1f", recommendation.settings.exposure)
+            showNotice(
+                "推荐：\(recommendation.profile.name)\n"
+                    + "曝光 \(exposure) EV · 色温 \(Int(recommendation.settings.temperature))K · "
+                    + "高光 \(Int(recommendation.settings.highlights)) · 阴影 \(Int(recommendation.settings.shadows))\n"
+                    + recommendation.reason,
+                duration: 4.2
+            )
         }
     }
 
@@ -286,13 +293,13 @@ final class EditorViewModel: ObservableObject {
         return "\(prefix)-\(look)-fullres"
     }
 
-    private func showNotice(_ text: String) {
+    private func showNotice(_ text: String, duration: Double = 2.8) {
         noticeTask?.cancel()
         withAnimation(.easeOut(duration: 0.16)) {
             noticeMessage = text
         }
         noticeTask = Task {
-            try? await Task.sleep(for: .seconds(2.8))
+            try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled else { return }
             withAnimation(.easeIn(duration: 0.18)) {
                 noticeMessage = nil

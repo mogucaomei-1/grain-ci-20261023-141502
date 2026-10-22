@@ -29,31 +29,31 @@ enum LocalLookAdvisor {
         if sample.saturation < 0.045 {
             scene = .triX
             sceneReason = "低饱和画面"
-        } else if sample.luminance < 0.25 && sample.saturation > 0.18 {
+        } else if sample.luminance < 0.24 && sample.saturation > 0.16 {
             scene = .cinestill
             sceneReason = "暗光环境"
-        } else if sample.skinRatio > 0.09 {
+        } else if sample.skinRatio > 0.13 {
             scene = sample.luminance > 0.57 ? .portra160 : .portra
-            sceneReason = "肤色占比较高"
+            sceneReason = "中心区域检测到人物肤色"
         } else if sample.blue > sample.red * 1.10 && sample.shadowRatio > 0.30 {
             scene = .film135t
             sceneReason = "冷青阴影与城市色调"
-        } else if sample.saturation > 0.33 && sample.green > sample.red * 1.02 {
-            scene = .velvia50
-            sceneReason = "高饱和绿植与风光"
+        } else if sample.green > sample.red * 1.04 && sample.saturation > 0.20 {
+            scene = sample.saturation > 0.39 ? .velvia50 : .superia400
+            sceneReason = "绿色植被占主导"
         } else if sample.red > sample.blue * 1.17 {
             scene = .gold
             sceneReason = "暖色主导"
-        } else if sample.highlightRatio > 0.16 && tonalRange > 0.58 {
+        } else if sample.highlightRatio > 0.17 && tonalRange > 0.60 {
             scene = .portra160
             sceneReason = "高光丰富且层次柔和"
         } else if sample.saturation < 0.15 {
             scene = .classicChrome
             sceneReason = "低饱和灰调画面"
-        } else if sample.luminance < 0.38 {
+        } else if sample.luminance < 0.34 {
             scene = .portra800
             sceneReason = "偏暗且光线柔和"
-        } else if sample.saturation > 0.24 && tonalRange > 0.62 {
+        } else if sample.saturation > 0.27 && tonalRange > 0.62 {
             scene = .ektar100
             sceneReason = "细节丰富且色彩明确"
         } else {
@@ -221,7 +221,17 @@ private struct ImageSample {
             totalSaturation += maximum > 0.001 ? (maximum - minimum) / maximum : 0
             if luma < 0.25 { shadowCount += 1 }
             if luma > 0.78 { highlightCount += 1 }
-            if r > 0.32, r > g * 1.06, g > b * 1.01, r - b > 0.08 {
+            let pixelIndex = index / 4
+            let x = pixelIndex % width
+            let y = pixelIndex / width
+            let isNearCenter = x >= width / 4 && x <= width * 3 / 4
+                && y >= height / 5 && y <= height * 4 / 5
+            let cb = 128 - 0.168736 * r * 255 - 0.331264 * g * 255 + 0.5 * b * 255
+            let cr = 128 + 0.5 * r * 255 - 0.418688 * g * 255 - 0.081312 * b * 255
+            if isNearCenter,
+               cb >= 76, cb <= 128,
+               cr >= 133, cr <= 176,
+               luma > 0.15 {
                 skinCount += 1
             }
         }
