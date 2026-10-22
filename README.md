@@ -4,9 +4,10 @@ iPhone RAW 胶片工作台。应用源码位于 `outputs/GRAIN`，交互原型�
 
 ## 在 GitHub 生成企业签名 IPA
 
-仓库提供两个 Actions：
+仓库提供三个 Actions：
 
 - `Validate iOS Build`：无需签名，自动编译 iOS Simulator 版本，用于发现 Swift/Xcode 编译问题。
+- `Build Unsigned IPA`：无需证书生成设备架构的未签名 IPA，供第三方企业签名服务重签。
 - `Build Enterprise IPA`：导入企业签名证书与描述文件，Archive 后导出企业分发 IPA。
 
 签名文件不会提交到仓库。运行 [`Build Enterprise IPA`](.github/workflows/build-enterprise-ipa.yml) 前，需要在 GitHub 仓库的 `Settings > Secrets and variables > Actions` 中添加：
