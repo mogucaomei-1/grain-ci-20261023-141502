@@ -297,14 +297,17 @@ private struct PhotoEditorCanvas: View {
                             .resizable()
                             .scaledToFit()
                             .transition(.opacity)
-                            .onTapGesture {
-                                selectedTextID = nil
-                                showFullscreen = true
-                            }
                     } else {
                         ProgressView()
                             .tint(GrainTheme.paper)
                     }
+
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedTextID = nil
+                            showFullscreen = true
+                        }
 
                     ForEach(editor.textOverlays) { overlay in
                         EditableTextOverlayView(
@@ -395,7 +398,6 @@ private struct PhotoEditorCanvas: View {
                         }
                     }
                     .padding(13)
-                    .contentShape(Rectangle())
                 }
                 .coordinateSpace(name: "photo-editor-canvas")
                 .frame(width: proxy.size.width, height: imageHeight)
