@@ -16,7 +16,6 @@ struct RootView: View {
             VStack(spacing: 0) {
                 MinimalTopBar(
                     hasPhoto: editor.photo != nil,
-                    onBack: editor.returnHome,
                     onFiles: { showDocumentPicker = true },
                     onInfo: { showInfoSheet = true },
                     histogramVisible: showHistogram,
@@ -88,6 +87,24 @@ struct RootView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .overlay(alignment: .leading) {
+            if editor.photo != nil {
+                Color.clear
+                    .frame(width: 24)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 12)
+                            .onEnded { value in
+                                let horizontal = value.translation.width
+                                let vertical = abs(value.translation.height)
+                                if horizontal > 72, horizontal > vertical * 1.6 {
+                                    editor.returnHome()
+                                }
+                            }
+                    )
+                    .accessibilityLabel("右滑返回照片图库")
+            }
+        }
     }
 
     private func importLibraryAsset(_ asset: PHAsset) {
@@ -104,7 +121,6 @@ struct RootView: View {
 
 private struct MinimalTopBar: View {
     let hasPhoto: Bool
-    let onBack: () -> Void
     let onFiles: () -> Void
     let onInfo: () -> Void
     let histogramVisible: Bool
@@ -114,22 +130,13 @@ private struct MinimalTopBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 9) {
-                if hasPhoto {
-                    Button(action: onBack) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 32, height: 38)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(GrainTheme.paper)
-                }
-
                 AnimatedCameraMark(size: 29)
 
                 Text("GRAIN")
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
                     .tracking(2.3)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
 
             Spacer()

@@ -15,7 +15,8 @@ struct CropEditorView: View {
 
                 GeometryReader { proxy in
                     if let displayImage {
-                        let imageRect = fittedRect(for: displayImage, in: proxy.size.insetBy(dx: 16, dy: 18))
+                        let bounds = CGRect(origin: .zero, size: proxy.size).insetBy(dx: 16, dy: 18)
+                        let imageRect = fittedRect(for: displayImage, in: bounds)
                         ZStack {
                             Image(decorative: displayImage, scale: 1)
                                 .resizable()
