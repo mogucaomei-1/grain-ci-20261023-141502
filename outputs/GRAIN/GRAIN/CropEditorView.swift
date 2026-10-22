@@ -21,6 +21,8 @@ struct CropEditorView: View {
                             Image(decorative: displayImage, scale: 1)
                                 .resizable()
                                 .scaledToFit()
+                                .frame(width: imageRect.width, height: imageRect.height)
+                                .position(x: imageRect.midX, y: imageRect.midY)
 
                             CropSelectionOverlay(
                                 crop: $crop,

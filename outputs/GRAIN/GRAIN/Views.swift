@@ -41,6 +41,7 @@ struct RootView: View {
                     if editor.photo != nil {
                         EditorWorkspace(showHistogram: showHistogram)
                             .offset(x: editorSwipeOffset)
+                            .background(GrainTheme.black.ignoresSafeArea())
                             .transition(
                                 .asymmetric(
                                     insertion: .move(edge: .trailing),
