@@ -206,7 +206,7 @@ private struct MinimalTopBar: View {
         HStack(spacing: 12) {
             HStack(spacing: 9) {
                 Button(action: onSettings) {
-                    AnimatedCameraMark(size: 29)
+                    AnimatedEditorMark(size: 29)
                         .frame(width: 38, height: 38)
                         .contentShape(Rectangle())
                 }

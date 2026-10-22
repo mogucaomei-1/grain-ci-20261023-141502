@@ -70,6 +70,36 @@ final class PhotoLibraryViewModel: NSObject, ObservableObject, PHPhotoLibraryCha
         return url
     }
 
+    func deleteAssets(identifiers: Set<String>) async throws {
+        guard !identifiers.isEmpty else { return }
+        let assets = PHAsset.fetchAssets(
+            withLocalIdentifiers: Array(identifiers),
+            options: nil
+        )
+        guard assets.count > 0 else { return }
+
+        try await withCheckedThrowingContinuation { continuation in
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.deleteAssets(assets)
+            } completionHandler: { success, error in
+                if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(
+                        throwing: error ?? NSError(
+                            domain: "GRAIN.PhotoLibrary",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: "无法删除所选照片，请稍后重试。"
+                            ]
+                        )
+                    )
+                }
+            }
+        }
+        await refresh()
+    }
+
     private var originalRequestGeneration = 0
 }
 
@@ -134,22 +164,32 @@ struct PhotoLibraryHome: View {
     @ObservedObject var library: PhotoLibraryViewModel
     let onSelect: (PHAsset) -> Void
     @Environment(\.openURL) private var openURL
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
+    @State private var isSelecting = false
+    @State private var selectedIdentifiers = Set<String>()
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 3), count: 3)
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                if !library.assets.isEmpty {
-                    Text("\(library.assets.count)")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(GrainTheme.muted)
+            if isSelecting {
+                selectionToolbar
+            } else {
+                HStack {
+                    Spacer()
+                    if !library.assets.isEmpty {
+                        Text("\(library.assets.count)")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(GrainTheme.muted)
+                    }
                 }
+                .padding(.horizontal, 12)
+                .padding(.top, 2)
+                .padding(.bottom, 4)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 2)
-            .padding(.bottom, 4)
 
             if library.accessDenied {
                 permissionView
@@ -157,18 +197,10 @@ struct PhotoLibraryHome: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 2) {
                         ForEach(library.assets, id: \.localIdentifier) { asset in
-                            Button {
-                                onSelect(asset)
-                            } label: {
-                                AssetThumbnail(asset: asset)
-                                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-                                    .id(asset.localIdentifier)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(library.isDownloadingOriginal)
+                            libraryTile(asset)
                         }
                     }
-                    .padding(.horizontal, 3)
+                    .padding(.horizontal, 4)
                     .padding(.bottom, 24)
                 }
                 .scrollIndicators(.hidden)
@@ -180,11 +212,17 @@ struct PhotoLibraryHome: View {
         .task {
             await library.loadIfNeeded()
         }
+        .onChange(of: library.assets.map(\.localIdentifier)) { _, identifiers in
+            selectedIdentifiers.formIntersection(Set(identifiers))
+            if identifiers.isEmpty {
+                isSelecting = false
+            }
+        }
         .overlay {
-            if library.isLoading || library.isDownloadingOriginal {
+            if library.isLoading || library.isDownloadingOriginal || isDeleting {
                 VStack(spacing: 10) {
                     ProgressView().tint(GrainTheme.paper)
-                    Text(library.isDownloadingOriginal ? "正在从 iCloud 下载原图" : "正在载入照片")
+                    Text(statusText)
                         .font(.system(size: 9.5, weight: .medium, design: .rounded))
                         .foregroundStyle(GrainTheme.paper)
                 }
@@ -192,6 +230,187 @@ struct PhotoLibraryHome: View {
                 .padding(.vertical, 13)
                 .background(.black.opacity(0.74), in: Capsule())
             }
+        }
+        .confirmationDialog(
+            "删除所选的 \(selectedIdentifiers.count) 张照片？",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("删除照片", role: .destructive) {
+                deleteSelectedAssets()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("照片会从系统图库中删除，此操作无法撤销。")
+        }
+        .alert(
+            "无法删除照片",
+            isPresented: Binding(
+                get: { deleteError != nil },
+                set: { if !$0 { deleteError = nil } }
+            )
+        ) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(deleteError ?? "")
+        }
+    }
+
+    private var selectionToolbar: some View {
+        HStack(spacing: 10) {
+            Button("取消") {
+                endSelection()
+            }
+            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .foregroundStyle(GrainTheme.paper)
+            .buttonStyle(.plain)
+
+            Text("已选择 \(selectedIdentifiers.count) 张")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(GrainTheme.accent)
+
+            Spacer()
+
+            Button(allAssetsSelected ? "取消全选" : "全选") {
+                if allAssetsSelected {
+                    selectedIdentifiers.removeAll()
+                } else {
+                    selectedIdentifiers = Set(library.assets.map(\.localIdentifier))
+                }
+                GrainHaptics.selection(enabled: hapticsEnabled)
+            }
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .foregroundStyle(GrainTheme.muted)
+            .buttonStyle(.plain)
+            .disabled(!allAssetsSelected && library.assets.isEmpty)
+
+            Button {
+                showDeleteConfirmation = true
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(
+                        selectedIdentifiers.isEmpty ? GrainTheme.muted : GrainTheme.accent
+                    )
+                    .frame(width: 32, height: 28)
+                    .background(GrainTheme.raised, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedIdentifiers.isEmpty || isDeleting)
+            .accessibilityLabel("删除所选照片")
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 3)
+        .padding(.bottom, 5)
+    }
+
+    private var allAssetsSelected: Bool {
+        !library.assets.isEmpty
+            && selectedIdentifiers.count == library.assets.count
+    }
+
+    private var statusText: String {
+        if isDeleting { return "正在删除照片" }
+        if library.isDownloadingOriginal { return "正在从 iCloud 下载原图" }
+        return "正在载入照片"
+    }
+
+    private func libraryTile(_ asset: PHAsset) -> some View {
+        let selected = selectedIdentifiers.contains(asset.localIdentifier)
+
+        return ZStack(alignment: .topTrailing) {
+            AssetThumbnail(asset: asset)
+                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                .id(asset.localIdentifier)
+
+            if isSelecting {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(Color.black.opacity(selected ? 0.22 : 0.04))
+
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 19, weight: .semibold))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(
+                        selected ? GrainTheme.paper : Color.white.opacity(0.86),
+                        selected ? GrainTheme.accent : Color.black.opacity(0.34)
+                    )
+                    .padding(6)
+
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .stroke(
+                        selected ? GrainTheme.accent : Color.clear,
+                        lineWidth: 2
+                    )
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .contentShape(Rectangle())
+        .gesture(libraryTileGesture(asset))
+        .accessibilityLabel(
+            isSelecting
+                ? (selected ? "已选中照片" : "未选中照片")
+                : "编辑照片"
+        )
+    }
+
+    private func libraryTileGesture(_ asset: PHAsset) -> some Gesture {
+        TapGesture()
+            .exclusively(before: LongPressGesture(minimumDuration: 0.36))
+            .onEnded { result in
+                guard !library.isDownloadingOriginal, !isDeleting else { return }
+                switch result {
+                case .first:
+                    if isSelecting {
+                        toggleSelection(asset)
+                    } else {
+                        onSelect(asset)
+                    }
+                case .second:
+                    if !isSelecting {
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            isSelecting = true
+                            selectedIdentifiers.insert(asset.localIdentifier)
+                        }
+                    } else {
+                        selectedIdentifiers.insert(asset.localIdentifier)
+                    }
+                    GrainHaptics.mediumImpact(enabled: hapticsEnabled)
+                }
+            }
+    }
+
+    private func toggleSelection(_ asset: PHAsset) {
+        if selectedIdentifiers.contains(asset.localIdentifier) {
+            selectedIdentifiers.remove(asset.localIdentifier)
+        } else {
+            selectedIdentifiers.insert(asset.localIdentifier)
+        }
+        GrainHaptics.selection(enabled: hapticsEnabled)
+    }
+
+    private func endSelection() {
+        withAnimation(.easeOut(duration: 0.16)) {
+            isSelecting = false
+            selectedIdentifiers.removeAll()
+        }
+    }
+
+    private func deleteSelectedAssets() {
+        let identifiers = selectedIdentifiers
+        guard !identifiers.isEmpty else { return }
+        isDeleting = true
+
+        Task {
+            do {
+                try await library.deleteAssets(identifiers: identifiers)
+                withAnimation(.easeOut(duration: 0.18)) {
+                    isSelecting = false
+                    selectedIdentifiers.removeAll()
+                }
+            } catch {
+                deleteError = error.localizedDescription
+            }
+            isDeleting = false
         }
     }
 

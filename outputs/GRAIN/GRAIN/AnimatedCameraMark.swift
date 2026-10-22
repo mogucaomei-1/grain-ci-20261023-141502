@@ -1,104 +1,101 @@
 import SwiftUI
 
-struct AnimatedCameraMark: View {
+struct AnimatedEditorMark: View {
     let size: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
-            let phase = reduceMotion ? 0.08 : time.truncatingRemainder(dividingBy: 2.8) / 2.8
-            let pulse = reduceMotion ? 0.62 : (sin(time * 3.8) + 1) / 2
+            let pulse = reduceMotion ? 0.55 : (sin(time * 2.8) + 1) / 2
+            let sway = reduceMotion ? 0 : sin(time * 1.7) * 1.4
 
             ZStack {
-                if size >= 68 {
-                    motionLines
-                        .opacity(0.45 + pulse * 0.35)
-                }
+                photoCard(color: Color(hex: 0x43848A))
+                    .rotationEffect(.degrees(-11 + sway * 0.35))
+                    .offset(x: -size * 0.16, y: size * 0.025)
+                    .opacity(0.86)
 
-                RoundedRectangle(cornerRadius: size * 0.085, style: .continuous)
-                    .fill(GrainTheme.paper)
-                    .frame(width: size * 0.26, height: size * 0.15)
-                    .offset(y: -size * 0.26)
+                photoCard(color: GrainTheme.accent)
+                    .rotationEffect(.degrees(11 - sway * 0.35))
+                    .offset(x: size * 0.16, y: size * 0.025)
+                    .opacity(0.82)
 
-                RoundedRectangle(cornerRadius: size * 0.085, style: .continuous)
-                    .fill(GrainTheme.paper)
-                    .frame(width: size * 0.72, height: size * 0.43)
-                    .offset(y: size * 0.09)
-
-                RoundedRectangle(cornerRadius: size * 0.035, style: .continuous)
-                    .fill(GrainTheme.paper)
-                    .frame(width: size * 0.12, height: size * 0.045)
-                    .offset(x: -size * 0.24, y: -size * 0.14)
-
-                Circle()
-                    .fill(GrainTheme.black)
-                    .frame(width: size * 0.42, height: size * 0.42)
-                    .offset(x: -size * 0.02, y: size * 0.09)
-
-                Circle()
-                    .fill(Color(hex: 0x23231F))
-                    .frame(width: size * 0.31, height: size * 0.31)
-                    .offset(x: -size * 0.02, y: size * 0.09)
-
-                Circle()
-                    .trim(from: phase, to: phase + 0.34)
-                    .stroke(
-                        Color(hex: 0x43848A),
-                        style: StrokeStyle(lineWidth: max(1.4, size * 0.037), lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: size * 0.265, height: size * 0.265)
-                    .offset(x: -size * 0.02, y: size * 0.09)
-
-                Circle()
-                    .trim(from: phase + 0.43, to: phase + 0.82)
-                    .stroke(
-                        GrainTheme.accent,
-                        style: StrokeStyle(lineWidth: max(1.4, size * 0.037), lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: size * 0.265, height: size * 0.265)
-                    .offset(x: -size * 0.02, y: size * 0.09)
-
-                Circle()
-                    .fill(GrainTheme.paper.opacity(0.82))
-                    .frame(width: max(2, size * 0.047), height: max(2, size * 0.047))
-                    .offset(x: -size * 0.06, y: size * 0.045)
-
-                Circle()
-                    .fill(GrainTheme.accent)
-                    .frame(width: max(2.5, size * 0.075), height: max(2.5, size * 0.075))
-                    .scaleEffect(0.86 + pulse * 0.22)
-                    .offset(x: size * 0.205, y: -size * 0.07)
-
-                if size >= 68 {
-                    VStack(spacing: size * 0.035) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            Capsule()
-                                .fill(GrainTheme.black.opacity(0.28))
-                                .frame(width: size * 0.07, height: max(1, size * 0.012))
-                        }
-                    }
-                    .offset(x: -size * 0.27, y: size * 0.09)
-                }
+                frontEditor(progress: 0.38 + pulse * 0.24)
+                    .rotationEffect(.degrees(sway * 0.16))
+                    .offset(y: -size * 0.015)
             }
             .frame(width: size, height: size)
         }
         .accessibilityHidden(true)
     }
 
-    private var motionLines: some View {
-        VStack(alignment: .trailing, spacing: size * 0.05) {
-            ForEach(0..<3, id: \.self) { index in
-                Capsule()
-                    .fill(GrainTheme.paper.opacity(0.24))
-                    .frame(
-                        width: size * (0.16 - CGFloat(index) * 0.025),
-                        height: max(1, size * 0.012)
-                    )
+    private func photoCard(color: Color) -> some View {
+        RoundedRectangle(cornerRadius: size * 0.11, style: .continuous)
+            .fill(color)
+            .frame(width: size * 0.50, height: size * 0.62)
+            .overlay {
+                RoundedRectangle(cornerRadius: size * 0.075, style: .continuous)
+                    .fill(Color.black.opacity(0.18))
+                    .padding(size * 0.045)
+                    .overlay {
+                        Circle()
+                            .fill(GrainTheme.paper.opacity(0.28))
+                            .frame(width: size * 0.09, height: size * 0.09)
+                            .offset(x: -size * 0.07, y: -size * 0.05)
+                    }
             }
-        }
-        .offset(x: -size * 0.40, y: -size * 0.02)
+    }
+
+    private func frontEditor(progress: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: size * 0.09, style: .continuous)
+            .fill(GrainTheme.paper)
+            .frame(width: size * 0.54, height: size * 0.66)
+            .overlay {
+                ZStack {
+                    RoundedRectangle(cornerRadius: size * 0.055, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: 0x222A31),
+                                    Color(hex: 0x50615D)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: size * 0.42, height: size * 0.35)
+                        .overlay(alignment: .bottomTrailing) {
+                            Circle()
+                                .fill(GrainTheme.accent)
+                                .frame(width: size * 0.105, height: size * 0.105)
+                                .offset(x: -size * 0.045, y: -size * 0.04)
+                        }
+                        .offset(y: -size * 0.075)
+
+                    Capsule()
+                        .fill(Color.black.opacity(0.13))
+                        .frame(width: size * 0.37, height: max(1.5, size * 0.032))
+                        .offset(y: size * 0.205)
+
+                    Capsule()
+                        .fill(GrainTheme.accent)
+                        .frame(
+                            width: size * 0.37 * progress,
+                            height: max(1.5, size * 0.032)
+                        )
+                        .frame(width: size * 0.37, alignment: .leading)
+                        .offset(y: size * 0.205)
+
+                    Circle()
+                        .fill(GrainTheme.paper)
+                        .frame(width: max(3, size * 0.064), height: max(3, size * 0.064))
+                        .shadow(color: .black.opacity(0.3), radius: 1, y: 1)
+                        .offset(
+                            x: -size * 0.185 + size * 0.37 * progress,
+                            y: size * 0.205
+                        )
+                }
+            }
     }
 }
