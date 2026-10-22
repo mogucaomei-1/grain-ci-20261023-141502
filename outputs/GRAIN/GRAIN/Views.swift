@@ -9,52 +9,53 @@ struct RootView: View {
     @State private var showDocumentPicker = false
     @State private var showExportSheet = false
     @State private var showInfoSheet = false
-    @State private var editorSwipeOffset: CGFloat = 0
 
     var body: some View {
         ZStack {
             GrainBackground()
 
-            VStack(spacing: 0) {
-                MinimalTopBar(
-                    hasPhoto: editor.photo != nil,
-                    onFiles: { showDocumentPicker = true },
-                    onInfo: { showInfoSheet = true },
-                    histogramVisible: showHistogram,
-                    onToggleHistogram: {
-                        withAnimation(.easeOut(duration: 0.18)) {
+            NavigationStack {
+                VStack(spacing: 0) {
+                    MinimalTopBar(
+                        hasPhoto: false,
+                        onFiles: { showDocumentPicker = true },
+                        onInfo: { showInfoSheet = true },
+                        histogramVisible: showHistogram,
+                        onToggleHistogram: {
                             showHistogram.toggle()
-                        }
-                    },
-                    onExport: {
-                        editor.exportResult = nil
-                        showExportSheet = true
-                    }
-                )
+                        },
+                        onExport: {}
+                    )
 
-                ZStack {
                     PhotoLibraryHome(library: photoLibrary) { asset in
                         importLibraryAsset(asset)
                     }
-                    .allowsHitTesting(editor.photo == nil)
-                    .accessibilityHidden(editor.photo != nil)
-
-                    if editor.photo != nil {
-                        EditorWorkspace(showHistogram: showHistogram)
-                            .offset(x: editorSwipeOffset)
-                            .background(GrainTheme.black.ignoresSafeArea())
-                            .transition(
-                                .asymmetric(
-                                    insertion: .move(edge: .trailing),
-                                    removal: .move(edge: .trailing)
-                                )
-                            )
-                            .zIndex(1)
-                    }
                 }
+                .background(GrainTheme.black)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-                .animation(.spring(response: 0.28, dampingFraction: 0.92, blendDuration: 0.08), value: editor.photo?.id)
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(isPresented: editorPresented) {
+                    VStack(spacing: 0) {
+                        MinimalTopBar(
+                            hasPhoto: true,
+                            onFiles: { showDocumentPicker = true },
+                            onInfo: { showInfoSheet = true },
+                            histogramVisible: showHistogram,
+                            onToggleHistogram: {
+                                showHistogram.toggle()
+                            },
+                            onExport: {
+                                editor.exportResult = nil
+                                showExportSheet = true
+                            }
+                        )
+
+                        EditorWorkspace(showHistogram: showHistogram)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(GrainTheme.black.ignoresSafeArea())
+                    .toolbar(.hidden, for: .navigationBar)
+                }
             }
         }
         .sheet(isPresented: $showDocumentPicker) {
@@ -118,41 +119,6 @@ struct RootView: View {
                 .background(.black.opacity(0.78), in: Capsule())
             }
         }
-        .overlay(alignment: .leading) {
-            if editor.photo != nil {
-                Color.clear
-                    .frame(width: 24)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 12)
-                            .onChanged { value in
-                                let horizontal = value.translation.width
-                                let vertical = abs(value.translation.height)
-                                if horizontal > 0, horizontal > vertical * 1.35 {
-                                    editorSwipeOffset = min(horizontal, 260)
-                                }
-                            }
-                            .onEnded { value in
-                                let horizontal = value.translation.width
-                                let vertical = abs(value.translation.height)
-                                if horizontal > 72 || value.predictedEndTranslation.width > 150 {
-                                    withAnimation(.spring(response: 0.27, dampingFraction: 0.92, blendDuration: 0.06)) {
-                                        editor.returnHome()
-                                        editorSwipeOffset = 0
-                                    }
-                                    Task {
-                                        await photoLibrary.refresh()
-                                    }
-                                } else {
-                                    withAnimation(.spring(response: 0.23, dampingFraction: 0.92, blendDuration: 0.05)) {
-                                        editorSwipeOffset = 0
-                                    }
-                                }
-                            }
-                    )
-                    .accessibilityLabel("右滑返回照片图库")
-            }
-        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task {
@@ -160,6 +126,20 @@ struct RootView: View {
                 }
             }
         }
+    }
+
+    private var editorPresented: Binding<Bool> {
+        Binding(
+            get: { editor.photo != nil },
+            set: { presented in
+                if !presented {
+                    editor.returnHome()
+                    Task {
+                        await photoLibrary.refresh()
+                    }
+                }
+            }
+        )
     }
 
     private func importLibraryAsset(_ asset: PHAsset) {
@@ -476,59 +456,63 @@ private struct EditableTextOverlayView: View {
                             .allowsHitTesting(false)
                     }
                 }
+                .contentShape(Rectangle())
+                .gesture(textDragGesture)
+                .onTapGesture {
+                    if selected {
+                        onEdit()
+                    } else {
+                        onSelect()
+                    }
+                }
 
             if selected {
                 Button(action: onDelete) {
                     Image(systemName: "xmark")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 21, height: 21)
+                        .frame(width: 22, height: 22)
                         .background(Color(hex: 0xB64532), in: Circle())
                         .overlay {
                             Circle().stroke(Color.white.opacity(0.75), lineWidth: 0.7)
                         }
                 }
                 .buttonStyle(.plain)
-                .padding(1)
+                .offset(x: 11, y: -11)
                 .accessibilityLabel("删除文字")
                 .zIndex(3)
             }
         }
+        .padding(14)
         .contentShape(Rectangle())
         .position(
             x: overlay.x * canvasSize.width,
             y: overlay.y * canvasSize.height
         )
-        .gesture(
-            DragGesture(minimumDistance: 4, coordinateSpace: .named("photo-editor-canvas"))
-                .onChanged { value in
-                    if dragOrigin == nil {
-                        dragOrigin = CGPoint(
-                            x: overlay.x * canvasSize.width,
-                            y: overlay.y * canvasSize.height
-                        )
-                        onMoveStart()
-                    }
-                    guard let origin = dragOrigin else { return }
-                    onMove(
-                        CGPoint(
-                            x: origin.x + value.translation.width,
-                            y: origin.y + value.translation.height
-                        )
-                    )
-                }
-                .onEnded { _ in
-                    dragOrigin = nil
-                }
-        )
-        .onTapGesture {
-            if selected {
-                onEdit()
-            } else {
-                onSelect()
-            }
-        }
         .zIndex(selected ? 2 : 1)
+    }
+
+    private var textDragGesture: some Gesture {
+        DragGesture(minimumDistance: 4)
+            .onChanged { value in
+                if dragOrigin == nil {
+                    dragOrigin = CGPoint(
+                        x: overlay.x * canvasSize.width,
+                        y: overlay.y * canvasSize.height
+                    )
+                    onMoveStart()
+                }
+                guard let origin = dragOrigin else { return }
+                onMove(
+                    CGPoint(
+                        x: origin.x + value.translation.width,
+                        y: origin.y + value.translation.height
+                    )
+                )
+            }
+            .onEnded { _ in
+                dragOrigin = nil
+            }
     }
 }
 
