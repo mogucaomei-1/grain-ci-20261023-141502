@@ -407,57 +407,6 @@ struct RawImageProcessor {
             kCIInputAmountKey: settings.vibrance / 100 * amount
         ])
 
-        if profile == .film135t {
-            graded = graded.applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: 1.01, y: 0.02, z: 0, w: 0),
-                "inputGVector": CIVector(x: 0.00, y: 0.98, z: 0.03, w: 0),
-                "inputBVector": CIVector(x: 0.00, y: 0.04, z: 1.04, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-            ])
-        } else if profile == .classicChrome {
-            graded = graded.applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: 0.96, y: 0.02, z: 0.02, w: 0),
-                "inputGVector": CIVector(x: 0.01, y: 0.98, z: 0.04, w: 0),
-                "inputBVector": CIVector(x: 0.01, y: 0.06, z: 0.98, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-            ])
-        } else if profile == .pro400h {
-            graded = graded.applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: 0.98, y: 0.02, z: 0.02, w: 0),
-                "inputGVector": CIVector(x: 0, y: 1.02, z: 0.03, w: 0),
-                "inputBVector": CIVector(x: 0, y: 0.01, z: 1.01, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-            ])
-        } else if profile == .velvia50 {
-            graded = graded.applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: 1.06, y: 0.01, z: 0, w: 0),
-                "inputGVector": CIVector(x: 0, y: 1.04, z: 0.01, w: 0),
-                "inputBVector": CIVector(x: 0, y: 0.02, z: 0.98, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-            ])
-        } else if profile == .ektar100 {
-            graded = graded.applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: 1.05, y: 0, z: 0, w: 0),
-                "inputGVector": CIVector(x: 0, y: 0.99, z: 0.01, w: 0),
-                "inputBVector": CIVector(x: 0, y: 0.03, z: 1.02, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-            ])
-        } else if profile == .superia400 {
-            graded = graded.applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: 0.98, y: 0.01, z: 0.01, w: 0),
-                "inputGVector": CIVector(x: 0.01, y: 1.04, z: 0.02, w: 0),
-                "inputBVector": CIVector(x: 0, y: 0.04, z: 0.99, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-            ])
-        } else if profile == .vision250d {
-            graded = graded.applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: 1.02, y: 0.01, z: 0, w: 0),
-                "inputGVector": CIVector(x: 0, y: 1.0, z: 0.02, w: 0),
-                "inputBVector": CIVector(x: 0, y: 0.03, z: 0.97, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-            ])
-        }
-
         let clarity = settings.clarity * amount
         if clarity > 0.2 {
             graded = graded.applyingFilter("CIUnsharpMask", parameters: [
@@ -531,6 +480,118 @@ struct RawImageProcessor {
                 "inputRVector": CIVector(x: 1.03, y: 0.01, z: 0, w: 0),
                 "inputGVector": CIVector(x: 0.01, y: 0.99, z: 0.01, w: 0),
                 "inputBVector": CIVector(x: 0.01, y: 0.01, z: 0.96, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .film135t:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.01, y: 0.02, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.00, y: 0.98, z: 0.03, w: 0),
+                "inputBVector": CIVector(x: 0.00, y: 0.04, z: 1.04, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .classicChrome:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.96, y: 0.02, z: 0.02, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 0.98, z: 0.04, w: 0),
+                "inputBVector": CIVector(x: 0.01, y: 0.06, z: 0.98, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .pro400h:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.98, y: 0.02, z: 0.02, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.02, z: 0.03, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.01, z: 1.01, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .velvia50:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.06, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.04, z: 0.01, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.02, z: 0.98, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .ektar100:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.05, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 0.99, z: 0.01, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.03, z: 1.02, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .superia400:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.98, y: 0.01, z: 0.01, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.04, z: 0.02, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.04, z: 0.99, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .vision250d:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.02, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.0, z: 0.02, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.03, z: 0.97, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .classicNegative:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.05, y: 0.03, z: -0.02, w: 0),
+                "inputGVector": CIVector(x: -0.01, y: 1.00, z: 0.03, w: 0),
+                "inputBVector": CIVector(x: -0.03, y: 0.07, z: 1.00, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .nostalgicNeg:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.06, y: 0.02, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.00, z: -0.01, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.04, z: 0.93, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .realaAce:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.02, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.03, z: 0.01, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.02, z: 0.99, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .eterna:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.95, y: 0.02, z: 0.03, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 0.99, z: 0.03, w: 0),
+                "inputBVector": CIVector(x: 0.02, y: 0.05, z: 1.02, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .colorPlus200:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.05, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.00, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.02, z: 0.92, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .ultramax400:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.06, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.01, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.03, z: 0.94, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .c200:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.98, y: 0.02, z: 0.01, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.04, z: 0.02, w: 0),
+                "inputBVector": CIVector(x: 0.01, y: 0.04, z: 0.98, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .ektachrome100:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.04, y: 0, z: 0.01, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.00, z: 0.01, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.02, z: 1.04, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .vision500t:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.03, y: 0.02, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 0.98, z: 0.03, w: 0),
+                "inputBVector": CIVector(x: 0.02, y: 0.06, z: 1.08, w: 0),
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
             ])
         default:

@@ -293,7 +293,7 @@ private struct EditorWorkspace: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             FilmPresetBar()
-                .frame(height: 100)
+                .frame(height: 150)
 
             AdjustPanel(
                 onCrop: { showCropEditor = true },
@@ -776,7 +776,9 @@ private struct FullscreenPhotoView: View {
 private struct FilmPresetBar: View {
     @EnvironmentObject private var editor: EditorViewModel
     @AppStorage("filmOrder") private var filmOrder = ""
+    @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     @State private var showFilmOrderEditor = false
+    @State private var lastIntensityHaptic = 0.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -869,6 +871,34 @@ private struct FilmPresetBar: View {
             }
             .padding(.horizontal, 18)
 
+            HStack(spacing: 9) {
+                Text("强度")
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(GrainTheme.muted)
+                    .frame(width: 24, alignment: .leading)
+
+                Slider(
+                    value: intensityBinding,
+                    in: 0...100,
+                    onEditingChanged: { editing in
+                        if editing {
+                            editor.recordUndoSnapshot()
+                            lastIntensityHaptic = editor.intensity * 100
+                            GrainHaptics.prepare()
+                        }
+                    }
+                )
+                .tint(editor.selectedProfile == .neutral ? GrainTheme.muted : GrainTheme.accent)
+                .disabled(editor.selectedProfile == .neutral)
+
+                Text("\(Int((editor.intensity * 100).rounded()))%")
+                    .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(GrainTheme.paper)
+                    .frame(width: 34, alignment: .trailing)
+            }
+            .padding(.horizontal, 18)
+            .opacity(editor.selectedProfile == .neutral ? 0.38 : 1)
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 5) {
                     ForEach(orderedProfiles) { profile in
@@ -912,6 +942,21 @@ private struct FilmPresetBar: View {
                 .presentationDetents([.height(520)])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private var intensityBinding: Binding<Double> {
+        Binding(
+            get: { editor.intensity * 100 },
+            set: { value in
+                editor.intensity = value / 100
+                editor.markManualAdjustment()
+                if abs(value - lastIntensityHaptic) >= 2 {
+                    lastIntensityHaptic = value
+                    GrainHaptics.selection(enabled: hapticsEnabled)
+                }
+                editor.schedulePreview()
+            }
+        )
     }
 
     private var orderedProfiles: [FilmProfile] {

@@ -17,6 +17,15 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
     case superia400
     case cinestill
     case vision250d
+    case classicNegative
+    case nostalgicNeg
+    case realaAce
+    case eterna
+    case colorPlus200
+    case ultramax400
+    case c200
+    case ektachrome100
+    case vision500t
 
     var id: String { rawValue }
 
@@ -36,6 +45,15 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .superia400: "富士 超级 400"
         case .cinestill: "电影 夜光 800T"
         case .vision250d: "电影 Vision3 250D"
+        case .classicNegative: "富士 经典负片"
+        case .nostalgicNeg: "富士 怀旧负片"
+        case .realaAce: "富士 REALA ACE"
+        case .eterna: "富士 ETERNA 电影"
+        case .colorPlus200: "柯达 ColorPlus 200"
+        case .ultramax400: "柯达 Ultramax 400"
+        case .c200: "富士 C200"
+        case .ektachrome100: "柯达 反转片 E100"
+        case .vision500t: "电影 Vision3 500T"
         }
     }
 
@@ -55,6 +73,15 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .superia400: "超级"
         case .cinestill: "夜光"
         case .vision250d: "250D"
+        case .classicNegative: "经典负片"
+        case .nostalgicNeg: "怀旧"
+        case .realaAce: "REALA"
+        case .eterna: "ETERNA"
+        case .colorPlus200: "CP200"
+        case .ultramax400: "U400"
+        case .c200: "C200"
+        case .ektachrome100: "E100"
+        case .vision500t: "500T"
         }
     }
 
@@ -74,6 +101,15 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .superia400: "青绿阴影 · 日常街拍"
         case .cinestill: "钨丝蓝 · 夜景红晕"
         case .vision250d: "柔和日光 · 电影宽容度"
+        case .classicNegative: "深青绿 · 浓郁红橙 · 日常街拍"
+        case .nostalgicNeg: "琥珀暖调 · 柔和金色高光"
+        case .realaAce: "清晰自然 · 中性肤色 · 通透层次"
+        case .eterna: "低饱和电影色 · 青色阴影"
+        case .colorPlus200: "暖黄日光 · 轻复古彩色负片"
+        case .ultramax400: "鲜艳暖调 · 高宽容度日常记录"
+        case .c200: "清透青绿 · 柔和低对比"
+        case .ektachrome100: "通透红蓝 · 干净高光"
+        case .vision500t: "暖钨丝光 · 深青夜景"
         }
     }
 
@@ -93,6 +129,15 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .superia400: [0x3D765D, 0x8DB78A, 0xD4C8A6]
         case .cinestill: [0x2D5568, 0xB44E42, 0xD8B4A1]
         case .vision250d: [0x536F6B, 0xBE8B62, 0xD7C3A1]
+        case .classicNegative: [0x214F52, 0xA94C3C, 0xD9B477]
+        case .nostalgicNeg: [0x5D4231, 0xB56F44, 0xE6C88D]
+        case .realaAce: [0x37686A, 0x9AAE8B, 0xE4C9A5]
+        case .eterna: [0x28494E, 0x6A827A, 0xB7B09A]
+        case .colorPlus200: [0x99513A, 0xD6964C, 0xE8CD9A]
+        case .ultramax400: [0x9A3D35, 0xD46B3D, 0xE0BE77]
+        case .c200: [0x3E7168, 0x7DA88A, 0xD7C7A5]
+        case .ektachrome100: [0x285E69, 0xA93D39, 0xE0B765]
+        case .vision500t: [0x203B4D, 0x9A5437, 0xD2A46E]
         }
     }
 
@@ -168,6 +213,51 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
                   highlights: -6, shadows: 8, whites: -2, blacks: 4,
                   contrast: 0, vibrance: 5, saturation: -2, clarity: 0,
                   fade: 8, grain: 16, vignette: 12, sharpness: 5)
+        case .classicNegative:
+            .init(exposure: 0.06, temperature: 5900, tint: -4,
+                  highlights: -10, shadows: 4, whites: 2, blacks: 7,
+                  contrast: 10, vibrance: 2, saturation: -8, clarity: 1,
+                  fade: 6, grain: 18, vignette: 18, sharpness: 8)
+        case .nostalgicNeg:
+            .init(exposure: 0.10, temperature: 7400, tint: 5,
+                  highlights: -12, shadows: 10, whites: -4, blacks: 8,
+                  contrast: -6, vibrance: 8, saturation: 2, clarity: 0,
+                  fade: 14, grain: 24, vignette: 18, sharpness: 4)
+        case .realaAce:
+            .init(exposure: 0, temperature: 6300, tint: -2,
+                  highlights: -7, shadows: 4, whites: 4, blacks: 3,
+                  contrast: 8, vibrance: 8, saturation: -2, clarity: 3,
+                  fade: 3, grain: 12, vignette: 10, sharpness: 11)
+        case .eterna:
+            .init(exposure: 0.04, temperature: 6000, tint: -4,
+                  highlights: -10, shadows: 8, whites: -3, blacks: 6,
+                  contrast: -5, vibrance: 0, saturation: -18, clarity: -2,
+                  fade: 9, grain: 16, vignette: 14, sharpness: 3)
+        case .colorPlus200:
+            .init(exposure: 0.04, temperature: 7500, tint: 6,
+                  highlights: -5, shadows: 6, whites: 2, blacks: 3,
+                  contrast: 4, vibrance: 8, saturation: 6, clarity: 1,
+                  fade: 10, grain: 24, vignette: 16, sharpness: 5)
+        case .ultramax400:
+            .init(exposure: 0.08, temperature: 7200, tint: 3,
+                  highlights: -7, shadows: 5, whites: 1, blacks: 2,
+                  contrast: 6, vibrance: 10, saturation: 9, clarity: 2,
+                  fade: 7, grain: 26, vignette: 14, sharpness: 6)
+        case .c200:
+            .init(exposure: 0.10, temperature: 7100, tint: -3,
+                  highlights: -9, shadows: 7, whites: -2, blacks: 4,
+                  contrast: -4, vibrance: 5, saturation: -4, clarity: -2,
+                  fade: 12, grain: 20, vignette: 10, sharpness: 4)
+        case .ektachrome100:
+            .init(exposure: -0.02, temperature: 6400, tint: 1,
+                  highlights: -5, shadows: 3, whites: 5, blacks: 4,
+                  contrast: 14, vibrance: 8, saturation: 8, clarity: 7,
+                  fade: 2, grain: 9, vignette: 10, sharpness: 13)
+        case .vision500t:
+            .init(exposure: 0.08, temperature: 4700, tint: -6,
+                  highlights: -7, shadows: 10, whites: -3, blacks: 5,
+                  contrast: -2, vibrance: 6, saturation: -4, clarity: -3,
+                  fade: 10, grain: 28, vignette: 24, sharpness: 2)
         }
     }
 }
