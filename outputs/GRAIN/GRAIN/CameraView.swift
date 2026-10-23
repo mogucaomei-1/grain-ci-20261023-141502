@@ -354,9 +354,7 @@ final class CameraController: ObservableObject {
         _ settings: AVCapturePhotoSettings,
         configuration: CameraCaptureConfiguration
     ) {
-        if photoOutput.supportedFlashModes.contains(
-            NSNumber(value: configuration.flash.captureMode.rawValue)
-        ) {
+        if photoOutput.supportedFlashModes.contains(configuration.flash.captureMode) {
             settings.flashMode = configuration.flash.captureMode
         }
 
@@ -609,7 +607,7 @@ private enum CameraImageProcessor {
             return CameraPreparedOutput(
                 data: output.data,
                 fileName: "GRAIN-\(timestamp()).dng",
-                uniformTypeIdentifier: UTType.dng.identifier,
+                uniformTypeIdentifier: "com.adobe.digital-negative",
                 livePhotoURL: nil
             )
         }

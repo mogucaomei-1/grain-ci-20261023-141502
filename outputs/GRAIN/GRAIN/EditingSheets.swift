@@ -269,7 +269,7 @@ struct FilmOrderEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("filmOrder") private var filmOrder = ""
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
-    @State private var profiles = FilmProfile.allCases
+    @State private var profiles = FilmProfile.defaultDisplayOrder
     @State private var hasLoaded = false
 
     var body: some View {
@@ -352,7 +352,7 @@ struct FilmOrderEditorView: View {
         .onAppear {
             guard !hasLoaded else { return }
             hasLoaded = true
-            profiles = orderedProfiles(from: filmOrder)
+            profiles = FilmProfile.resolvedDisplayOrder(from: filmOrder)
         }
     }
 
@@ -363,7 +363,7 @@ struct FilmOrderEditorView: View {
 
     private func resetOrder() {
         withAnimation(.easeOut(duration: 0.2)) {
-            profiles = FilmProfile.allCases
+            profiles = FilmProfile.defaultDisplayOrder
         }
         persistOrder()
     }
@@ -373,14 +373,6 @@ struct FilmOrderEditorView: View {
         GrainHaptics.lightImpact(enabled: hapticsEnabled)
     }
 
-    private func orderedProfiles(from value: String) -> [FilmProfile] {
-        var seen = Set<String>()
-        let stored = value
-            .split(separator: ",")
-            .compactMap { FilmProfile(rawValue: String($0)) }
-            .filter { seen.insert($0.rawValue).inserted }
-        return stored + FilmProfile.allCases.filter { !seen.contains($0.rawValue) }
-    }
 }
 
 struct AppSettingsView: View {

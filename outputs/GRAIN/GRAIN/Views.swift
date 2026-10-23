@@ -921,7 +921,12 @@ private struct FilmPresetBar: View {
                 HStack(spacing: 5) {
                     ForEach(orderedProfiles) { profile in
                         Button {
-                            editor.selectProfile(profile)
+                            if profile != .neutral,
+                               editor.selectedProfile == profile {
+                                editor.selectProfile(.neutral)
+                            } else {
+                                editor.selectProfile(profile)
+                            }
                         } label: {
                             FilmPresetChip(
                                 profile: profile,
@@ -978,13 +983,7 @@ private struct FilmPresetBar: View {
     }
 
     private var orderedProfiles: [FilmProfile] {
-        var seen = Set<String>()
-        let stored = filmOrder
-            .split(separator: ",")
-            .compactMap { FilmProfile(rawValue: String($0)) }
-            .filter { seen.insert($0.rawValue).inserted }
-        let missing = FilmProfile.allCases.filter { !seen.contains($0.rawValue) }
-        return stored + missing
+        FilmProfile.resolvedDisplayOrder(from: filmOrder)
     }
 }
 

@@ -35,6 +35,47 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var id: String { rawValue }
 
+    static let dazzPriority: [FilmProfile] = [
+        .dazzFxnR,
+        .dazzCCDR,
+        .dazzDClassic,
+        .dazzGRDR,
+        .dazzDFunS,
+        .dazzClassicU
+    ]
+
+    static var defaultDisplayOrder: [FilmProfile] {
+        var result: [FilmProfile] = [.neutral]
+        result.append(contentsOf: dazzPriority)
+        result.append(contentsOf: allCases.filter { !result.contains($0) })
+        return result
+    }
+
+    static func resolvedDisplayOrder(from storedValue: String) -> [FilmProfile] {
+        let parsed = storedValue
+            .split(separator: ",")
+            .compactMap { FilmProfile(rawValue: String($0)) }
+        var seen = Set<String>()
+        let stored = parsed.filter { seen.insert($0.rawValue).inserted }
+        let hasCompleteDazzOrder = dazzPriority.allSatisfy {
+            seen.contains($0.rawValue)
+        }
+
+        if stored.isEmpty || !hasCompleteDazzOrder {
+            var result: [FilmProfile] = [.neutral]
+            result.append(contentsOf: dazzPriority)
+            result.append(contentsOf: stored.filter {
+                $0 != .neutral && !dazzPriority.contains($0)
+            })
+            result.append(contentsOf: defaultDisplayOrder.filter {
+                !result.contains($0)
+            })
+            return result
+        }
+
+        return stored + defaultDisplayOrder.filter { !seen.contains($0.rawValue) }
+    }
+
     var name: String {
         switch self {
         case .neutral: "原图"
