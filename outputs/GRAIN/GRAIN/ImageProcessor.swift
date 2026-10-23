@@ -156,6 +156,26 @@ struct RawImageProcessor {
         return edited
     }
 
+    static func renderLivePreview(
+        source: CIImage,
+        profile: FilmProfile,
+        settings: FilmSettings,
+        intensity: Double
+    ) -> CIImage {
+        var liveSettings = settings
+        liveSettings.grain = 0
+        let normalized = normalizedExtent(of: source)
+        let graded = applyFilm(
+            to: normalized,
+            profile: profile,
+            settings: liveSettings,
+            intensity: intensity,
+            grainScale: 1,
+            suppressVignette: false
+        )
+        return graded.cropped(to: normalized.extent)
+    }
+
     static func renderFullResolutionDisplay(
         from url: URL,
         profile: FilmProfile,

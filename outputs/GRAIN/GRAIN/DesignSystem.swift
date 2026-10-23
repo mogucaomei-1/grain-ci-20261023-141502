@@ -92,7 +92,7 @@ struct FilmPresetChip: View {
     }
 }
 
-private struct FilmCameraGlyph: View {
+struct FilmCameraGlyph: View {
     let palette: [Color]
 
     var body: some View {

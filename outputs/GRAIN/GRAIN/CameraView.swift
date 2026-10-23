@@ -120,11 +120,47 @@ struct CameraCaptureConfiguration {
     let livePhoto: Bool
 }
 
+private struct CameraPreviewLook {
+    let profile: FilmProfile
+    let settings: FilmSettings
+    let intensity: Double
+}
+
+private final class CameraPreviewLookStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = CameraPreviewLook(
+        profile: .neutral,
+        settings: FilmProfile.neutral.factorySettings,
+        intensity: 1
+    )
+
+    func update(profile: FilmProfile, settings: FilmSettings, intensity: Double) {
+        lock.lock()
+        value = CameraPreviewLook(profile: profile, settings: settings, intensity: intensity)
+        lock.unlock()
+    }
+
+    func read() -> CameraPreviewLook {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
 @MainActor
 final class CameraController: ObservableObject {
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
+    private let videoOutput = AVCaptureVideoDataOutput()
     private let sessionQueue = DispatchQueue(label: "studio.grain.camera.session")
+    private let videoOutputQueue = DispatchQueue(
+        label: "studio.grain.camera.preview",
+        qos: .userInitiated
+    )
+    private let previewLookStore = CameraPreviewLookStore()
+    private lazy var videoPreviewDelegate = CameraVideoPreviewDelegate(
+        lookStore: previewLookStore
+    )
     private var cameraDevice: AVCaptureDevice?
     private var videoInput: AVCaptureDeviceInput?
     private var activeProcessors: [Int64: CameraPhotoCaptureProcessor] = [:]
@@ -169,6 +205,18 @@ final class CameraController: ObservableObject {
         sessionQueue.async { [weak self] in
             self?.session.stopRunning()
         }
+    }
+
+    func attachPreview(_ view: CameraPreviewUIView) {
+        videoPreviewDelegate.previewView = view
+    }
+
+    func setPreviewLook(profile: FilmProfile, settings: FilmSettings, intensity: Double) {
+        previewLookStore.update(
+            profile: profile,
+            settings: settings,
+            intensity: intensity
+        )
     }
 
     func setZoom(_ zoom: CGFloat) {
@@ -387,6 +435,15 @@ final class CameraController: ObservableObject {
             guard session.canAddOutput(photoOutput) else {
                 throw CameraError.cannotConfigure
             }
+            videoOutput.alwaysDiscardsLateVideoFrames = true
+            videoOutput.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ]
+            videoOutput.setSampleBufferDelegate(videoPreviewDelegate, queue: videoOutputQueue)
+            guard session.canAddOutput(videoOutput) else {
+                throw CameraError.cannotConfigure
+            }
+            session.addOutput(videoOutput)
             session.addOutput(photoOutput)
             photoOutput.isHighResolutionCaptureEnabled = true
             photoOutput.isLivePhotoCaptureEnabled = photoOutput.isLivePhotoCaptureSupported
@@ -919,6 +976,7 @@ private enum CameraError: LocalizedError {
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
     let onFocus: (_ devicePoint: CGPoint, _ lock: Bool) -> Void
+    let onViewCreated: (CameraPreviewUIView) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -943,6 +1001,7 @@ struct CameraPreviewView: UIViewRepresentable {
         longPress.minimumPressDuration = 0.48
         view.addGestureRecognizer(tap)
         view.addGestureRecognizer(longPress)
+        onViewCreated(view)
         return view
     }
 
@@ -985,6 +1044,8 @@ struct CameraPreviewView: UIViewRepresentable {
 }
 
 final class CameraPreviewUIView: UIView {
+    private let filteredImageView = UIImageView()
+
     override class var layerClass: AnyClass {
         AVCaptureVideoPreviewLayer.self
     }
@@ -994,6 +1055,29 @@ final class CameraPreviewUIView: UIView {
     }
 
     private var latestFocusLayer: CALayer?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .black
+        filteredImageView.backgroundColor = .black
+        filteredImageView.contentMode = .scaleAspectFill
+        filteredImageView.clipsToBounds = true
+        filteredImageView.isUserInteractionEnabled = false
+        addSubview(filteredImageView)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        filteredImageView.frame = bounds
+    }
+
+    func updatePreview(_ image: UIImage) {
+        filteredImageView.image = image
+    }
 
     func showFocusReticle(at point: CGPoint, locked: Bool) {
         latestFocusLayer?.removeFromSuperlayer()
@@ -1021,7 +1105,7 @@ final class CameraPreviewUIView: UIView {
         scale.toValue = 1
         scale.duration = 0.18
         reticle.add(scale, forKey: "focus-in")
-        previewLayer.addSublayer(reticle)
+        filteredImageView.layer.addSublayer(reticle)
         latestFocusLayer = reticle
 
         guard !locked else { return }
@@ -1032,8 +1116,58 @@ final class CameraPreviewUIView: UIView {
     }
 }
 
+private final class CameraVideoPreviewDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    private static let context = CIContext(options: [
+        .cacheIntermediates: false
+    ])
+
+    weak var previewView: CameraPreviewUIView?
+    private let lookStore: CameraPreviewLookStore
+
+    init(lookStore: CameraPreviewLookStore) {
+        self.lookStore = lookStore
+    }
+
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+
+        let oriented = CIImage(cvPixelBuffer: pixelBuffer).oriented(.right)
+        let extent = oriented.extent
+        let scale = min(1, 820 / max(max(extent.width, extent.height), 1))
+        let scaled = oriented.transformed(
+            by: CGAffineTransform(scaleX: scale, y: scale)
+        )
+        let look = lookStore.read()
+        let filtered = RawImageProcessor.renderLivePreview(
+            source: scaled,
+            profile: look.profile,
+            settings: look.settings,
+            intensity: look.intensity
+        )
+        guard let image = Self.context.createCGImage(
+            filtered,
+            from: filtered.extent.integral
+        ) else {
+            return
+        }
+
+        let uiImage = UIImage(cgImage: image)
+        DispatchQueue.main.async { [weak self] in
+            self?.previewView?.updatePreview(uiImage)
+        }
+    }
+}
+
 struct CameraView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var editor: EditorViewModel
     @StateObject private var camera = CameraController()
     @State private var format: CameraCaptureFormat = .heif
     @State private var resolution: CameraResolution = .standard24
@@ -1043,6 +1177,9 @@ struct CameraView: View {
     @State private var livePhoto = false
     @State private var showGrid = true
     @State private var zoomGestureBase: CGFloat?
+    @AppStorage("filmOrder") private var filmOrder = ""
+    @State private var cameraProfile: FilmProfile = .neutral
+    @State private var cameraIntensity = 1.0
 
     private let zoomOptions: [CGFloat] = [0.5, 1, 2, 4, 8]
 
@@ -1054,7 +1191,8 @@ struct CameraView: View {
                 onFocus: { devicePoint, lock in
                     camera.focus(at: devicePoint, lock: lock)
                     GrainHaptics.lightImpact(enabled: true)
-                }
+                },
+                onViewCreated: camera.attachPreview
             )
                 .ignoresSafeArea()
                 .simultaneousGesture(pinchToZoomGesture)
@@ -1118,6 +1256,9 @@ struct CameraView: View {
         .statusBarHidden()
         .task {
             await camera.start()
+            cameraProfile = editor.selectedProfile
+            cameraIntensity = editor.selectedProfile == .neutral ? 1 : editor.intensity
+            applyCameraPreviewLook()
         }
         .onDisappear {
             camera.stop()
@@ -1126,6 +1267,15 @@ struct CameraView: View {
             if newValue == .raw {
                 livePhoto = false
             }
+        }
+        .onChange(of: cameraProfile) { _, _ in
+            if cameraProfile == .neutral {
+                cameraIntensity = 1
+            }
+            applyCameraPreviewLook()
+        }
+        .onChange(of: cameraIntensity) { _, _ in
+            applyCameraPreviewLook()
         }
     }
 
@@ -1209,6 +1359,74 @@ struct CameraView: View {
 
     private var cameraControls: some View {
         VStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Text(cameraProfile.shortName)
+                    .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                    .foregroundStyle(cameraProfile == .neutral ? GrainTheme.muted : GrainTheme.accent)
+                    .frame(width: 58, alignment: .leading)
+                Slider(value: $cameraIntensity, in: 0...1)
+                    .tint(GrainTheme.accent)
+                    .disabled(cameraProfile == .neutral)
+                Text("\(Int((cameraIntensity * 100).rounded()))%")
+                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(GrainTheme.paper)
+                    .frame(width: 32, alignment: .trailing)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 5) {
+                    ForEach(cameraProfiles) { profile in
+                        Button {
+                            if profile != .neutral, cameraProfile == profile {
+                                cameraProfile = .neutral
+                            } else {
+                                cameraProfile = profile
+                                if profile != .neutral {
+                                    cameraIntensity = 0.86
+                                }
+                            }
+                            GrainHaptics.selection(enabled: true)
+                        } label: {
+                            VStack(spacing: 2) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: profile.uiPalette,
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                    FilmCameraGlyph(palette: profile.uiPalette)
+                                        .scaleEffect(0.72)
+                                }
+                                .frame(width: 58, height: 36)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .stroke(
+                                            cameraProfile == profile
+                                                ? GrainTheme.accent
+                                                : Color.white.opacity(0.08),
+                                            lineWidth: cameraProfile == profile ? 2 : 0.7
+                                        )
+                                }
+
+                                Text(profile.shortName)
+                                    .font(.system(size: 7.5, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(
+                                        cameraProfile == profile
+                                            ? GrainTheme.paper
+                                            : GrainTheme.muted
+                                    )
+                                    .lineLimit(1)
+                                    .frame(width: 60)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             HStack(spacing: 5) {
                 ForEach(zoomOptions, id: \.self) { zoom in
                     Button {
@@ -1406,6 +1624,19 @@ struct CameraView: View {
 
     private func zoomLabel(_ zoom: CGFloat) -> String {
         zoom == floor(zoom) ? String(Int(zoom)) : String(format: "%.1f", zoom)
+    }
+
+    private var cameraProfiles: [FilmProfile] {
+        FilmProfile.resolvedDisplayOrder(from: filmOrder)
+    }
+
+    private func applyCameraPreviewLook() {
+        let settings = cameraProfile.factorySettings
+        camera.setPreviewLook(
+            profile: cameraProfile,
+            settings: settings,
+            intensity: cameraProfile == .neutral ? 1 : cameraIntensity
+        )
     }
 
     private var pinchToZoomGesture: some Gesture {
