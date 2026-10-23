@@ -48,7 +48,7 @@ struct FilmPresetChip: View {
     let selected: Bool
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             ZStack(alignment: .bottomLeading) {
                 LinearGradient(
                     colors: profile.uiPalette,
@@ -61,26 +61,26 @@ struct FilmPresetChip: View {
                     endPoint: .bottom
                 )
                 FilmCameraGlyph(palette: profile.uiPalette)
-                    .frame(width: 62, height: 39)
-                    .offset(x: 14, y: -7)
+                    .frame(width: 54, height: 34)
+                    .offset(x: 12, y: -7)
                 Text(profile.shortName)
                     .font(.system(size: 7.5, weight: .bold, design: .monospaced))
                     .tracking(0.7)
                     .foregroundStyle(.white)
                     .padding(7)
             }
-            .frame(width: 92, height: 56)
+            .frame(width: 82, height: 42)
             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 
             Text(profile.name)
-                .font(.system(size: 9, weight: selected ? .semibold : .regular, design: .rounded))
+                .font(.system(size: 8.2, weight: selected ? .semibold : .regular, design: .rounded))
                 .foregroundStyle(selected ? GrainTheme.paper : GrainTheme.muted)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.82)
-                .frame(width: 96, height: 25, alignment: .top)
+                .frame(width: 86, height: 22, alignment: .top)
         }
-        .padding(5)
+        .padding(4)
         .background(
             selected ? GrainTheme.raised : Color.clear,
             in: RoundedRectangle(cornerRadius: 13, style: .continuous)

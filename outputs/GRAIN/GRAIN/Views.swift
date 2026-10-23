@@ -322,8 +322,8 @@ private struct EditorWorkspace: View {
                     showTextEditor = true
                 }
             )
-            .frame(height: 202)
-            .padding(.bottom, 28)
+            .frame(height: 174)
+            .padding(.bottom, 18)
         }
         .fullScreenCover(isPresented: $showCropEditor) {
             CropEditorView()
@@ -370,6 +370,7 @@ private enum EditorToolPage: Int {
 }
 
 private struct EditorToolsPager: View {
+    @EnvironmentObject private var editor: EditorViewModel
     @Binding var page: EditorToolPage
     let onCrop: () -> Void
     let onMosaic: () -> Void
@@ -408,9 +409,56 @@ private struct EditorToolsPager: View {
 
                 Spacer()
 
-                Text(page == .film ? "右滑调节" : "左滑滤镜")
-                    .font(.system(size: 8.5, design: .rounded))
-                    .foregroundStyle(GrainTheme.muted.opacity(0.72))
+                Button {
+                    editor.undo()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(editor.canUndo ? GrainTheme.paper : GrainTheme.muted.opacity(0.35))
+                        .frame(width: 28, height: 26)
+                }
+                .buttonStyle(.plain)
+                .disabled(!editor.canUndo)
+                .accessibilityLabel("撤销上一步")
+
+                Button {
+                    editor.recommendLook()
+                } label: {
+                    Group {
+                        if editor.isRecommending {
+                            ProgressView()
+                                .controlSize(.mini)
+                        } else {
+                            Image(systemName: "wand.and.stars")
+                        }
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(
+                        editor.isRecommendationApplied ? GrainTheme.accent : GrainTheme.muted
+                    )
+                    .frame(width: 28, height: 26)
+                }
+                .buttonStyle(.plain)
+                .disabled(editor.isRecommending)
+                .accessibilityLabel("推荐调色")
+
+                Menu {
+                    Button("复制调色预设", systemImage: "doc.on.doc") {
+                        editor.copyPreset()
+                    }
+                    Button("粘贴调色预设", systemImage: "doc.on.clipboard") {
+                        editor.pastePreset()
+                    }
+                    Divider()
+                    Button("重置全部调整", systemImage: "arrow.counterclockwise", role: .destructive) {
+                        editor.resetAllAdjustments()
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(GrainTheme.muted)
+                        .frame(width: 28, height: 26)
+                }
             }
             .padding(.horizontal, 18)
             .frame(height: 34)
@@ -901,101 +949,13 @@ private struct FilmPresetBar: View {
     @State private var lastIntensityHaptic = 0.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("FILM")
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundStyle(GrainTheme.muted)
-                Text(editor.selectedProfile.name)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(GrainTheme.paper)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                Spacer()
-
-                Button {
-                    editor.undo()
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(editor.canUndo ? GrainTheme.paper : GrainTheme.muted.opacity(0.38))
-                        .frame(width: 27, height: 24)
-                        .background(GrainTheme.raised, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .disabled(!editor.canUndo)
-                .accessibilityLabel("撤销上一步")
-
-                Button {
-                    editor.copyPreset()
-                } label: {
-                    Label("复制", systemImage: "doc.on.doc")
-                        .font(.system(size: 8.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(GrainTheme.muted)
-                        .padding(.horizontal, 7)
-                        .frame(height: 24)
-                        .background(GrainTheme.raised, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("复制调色预设")
-
-                Button {
-                    editor.pastePreset()
-                } label: {
-                    Label("粘贴", systemImage: "doc.on.clipboard")
-                        .font(.system(size: 8.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(GrainTheme.muted)
-                        .padding(.horizontal, 7)
-                        .frame(height: 24)
-                        .background(GrainTheme.raised, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("粘贴调色预设")
-
-                Button {
-                    editor.recommendLook()
-                } label: {
-                    HStack(spacing: 4) {
-                        if editor.isRecommending {
-                            ProgressView()
-                                .controlSize(.mini)
-                                .tint(GrainTheme.accent)
-                        } else {
-                            Image(systemName: "wand.and.stars")
-                        }
-                        Text("推荐")
-                    }
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(editor.isRecommendationApplied ? GrainTheme.accent : GrainTheme.muted)
-                    .padding(.horizontal, 9)
-                    .frame(height: 24)
-                    .background(
-                        editor.isRecommendationApplied
-                            ? GrainTheme.accent.opacity(0.12)
-                            : GrainTheme.raised,
-                        in: Capsule()
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(editor.isRecommending)
-
-                Button {
-                    editor.resetAllAdjustments()
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(GrainTheme.muted)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 18)
-
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 9) {
-                Text("强度")
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                Text(editor.selectedProfile.shortName)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundStyle(GrainTheme.muted)
-                    .frame(width: 24, alignment: .leading)
+                    .lineLimit(1)
+                    .frame(width: 62, alignment: .leading)
 
                 Slider(
                     value: intensityBinding,
@@ -1020,7 +980,7 @@ private struct FilmPresetBar: View {
             .opacity(editor.selectedProfile == .neutral ? 0.38 : 1)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     ForEach(orderedProfiles) { profile in
                         Button {
                             if profile != .neutral,
@@ -1045,15 +1005,15 @@ private struct FilmPresetBar: View {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(GrainTheme.paper)
-                                .frame(width: 92, height: 56)
+                                .frame(width: 82, height: 42)
                                 .background(GrainTheme.raised, in: RoundedRectangle(cornerRadius: 9))
 
                             Text("编辑排序")
                                 .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                                 .foregroundStyle(GrainTheme.paper)
-                                .frame(width: 96, height: 25)
+                                .frame(width: 86, height: 21)
                         }
-                        .padding(5)
+                        .padding(4)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("编辑胶片排序")
@@ -1061,7 +1021,7 @@ private struct FilmPresetBar: View {
                 .padding(.horizontal, 16)
             }
         }
-        .padding(.top, 8)
+        .padding(.top, 6)
         .sheet(isPresented: $showFilmOrderEditor) {
             FilmOrderEditorView()
                 .presentationDetents([.height(520)])
@@ -1169,7 +1129,7 @@ private struct AdjustPanel: View {
     @State private var lastHapticValue = Double.nan
 
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 5) {
             HStack(spacing: 22) {
                 ForEach(AdjustCategory.allCases) { category in
                     Button {
@@ -1272,8 +1232,8 @@ private struct AdjustPanel: View {
             .frame(height: 31)
         }
         .padding(.horizontal, 18)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.top, 5)
+        .padding(.bottom, 8)
         .background(GrainTheme.surface)
         .overlay(alignment: .top) {
             Rectangle().fill(GrainTheme.line).frame(height: 1)
