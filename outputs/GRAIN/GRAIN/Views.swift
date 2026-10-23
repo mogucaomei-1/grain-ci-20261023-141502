@@ -297,6 +297,7 @@ private struct EditorWorkspace: View {
     @State private var showTextEditor = false
     @State private var showMosaicEditor = false
     @State private var didSwipeBack = false
+    @State private var editorToolPage: EditorToolPage = .film
 
     var body: some View {
         VStack(spacing: 0) {
@@ -310,10 +311,8 @@ private struct EditorWorkspace: View {
             }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            FilmPresetBar()
-                .frame(height: 168)
-
-            AdjustPanel(
+            EditorToolsPager(
+                page: $editorToolPage,
                 onCrop: { showCropEditor = true },
                 onMosaic: { showMosaicEditor = true },
                 onAddText: {
@@ -323,7 +322,8 @@ private struct EditorWorkspace: View {
                     showTextEditor = true
                 }
             )
-                .frame(height: 146)
+            .frame(height: 202)
+            .padding(.bottom, 28)
         }
         .fullScreenCover(isPresented: $showCropEditor) {
             CropEditorView()
@@ -342,6 +342,7 @@ private struct EditorWorkspace: View {
             }
         }
         .simultaneousGesture(edgeSwipeGesture)
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 
     private var edgeSwipeGesture: some Gesture {
@@ -359,6 +360,107 @@ private struct EditorWorkspace: View {
             }
             .onEnded { _ in
                 didSwipeBack = false
+            }
+    }
+}
+
+private enum EditorToolPage: Int {
+    case film
+    case adjust
+}
+
+private struct EditorToolsPager: View {
+    @Binding var page: EditorToolPage
+    let onCrop: () -> Void
+    let onMosaic: () -> Void
+    let onAddText: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                Button {
+                    withAnimation(.snappy(duration: 0.24)) {
+                        page = .film
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "camera.aperture")
+                        Text("胶片滤镜")
+                    }
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(page == .film ? GrainTheme.paper : GrainTheme.muted)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    withAnimation(.snappy(duration: 0.24)) {
+                        page = .adjust
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "slider.horizontal.3")
+                        Text("照片调节")
+                    }
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(page == .adjust ? GrainTheme.paper : GrainTheme.muted)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text(page == .film ? "右滑调节" : "左滑滤镜")
+                    .font(.system(size: 8.5, design: .rounded))
+                    .foregroundStyle(GrainTheme.muted.opacity(0.72))
+            }
+            .padding(.horizontal, 18)
+            .frame(height: 34)
+            .contentShape(Rectangle())
+            .gesture(pageSwipeGesture)
+            .overlay(alignment: .bottom) {
+                GeometryReader { proxy in
+                    Capsule()
+                        .fill(GrainTheme.accent)
+                        .frame(width: proxy.size.width * 0.25, height: 2)
+                        .offset(
+                            x: page == .film
+                                ? 18
+                                : proxy.size.width * 0.5
+                        )
+                        .animation(.snappy(duration: 0.24), value: page)
+                }
+                .frame(height: 2)
+            }
+
+            ZStack {
+                if page == .film {
+                    FilmPresetBar()
+                        .transition(.opacity.combined(with: .move(edge: .leading)))
+                } else {
+                    AdjustPanel(
+                        onCrop: onCrop,
+                        onMosaic: onMosaic,
+                        onAddText: onAddText
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .background(GrainTheme.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(GrainTheme.line).frame(height: 1)
+        }
+    }
+
+    private var pageSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 18)
+            .onEnded { value in
+                let horizontal = value.translation.width
+                let vertical = abs(value.translation.height)
+                guard abs(horizontal) > 46, abs(horizontal) > vertical * 1.2 else { return }
+                withAnimation(.snappy(duration: 0.24)) {
+                    page = horizontal < 0 ? .adjust : .film
+                }
             }
     }
 }

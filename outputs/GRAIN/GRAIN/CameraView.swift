@@ -172,22 +172,78 @@ final class CameraController: ObservableObject {
     }
 
     func setZoom(_ zoom: CGFloat) {
-        guard let cameraDevice else { return }
-        let clamped = min(max(zoom, minimumZoom), maximumZoom)
-        sessionQueue.async {
+        guard cameraDevice != nil else { return }
+        sessionQueue.async { [weak self] in
+            guard let self, var device = self.cameraDevice else { return }
             do {
-                try cameraDevice.lockForConfiguration()
-                cameraDevice.cancelVideoZoomRamp()
-                cameraDevice.videoZoomFactor = clamped
-                cameraDevice.unlockForConfiguration()
+                if !self.isUsingFrontCamera {
+                    let wantsUltraWide = zoom <= 0.55
+                    let isUltraWide = device.deviceType == .builtInUltraWideCamera
+                    if wantsUltraWide, !isUltraWide,
+                       let ultraWide = AVCaptureDevice.default(
+                           .builtInUltraWideCamera,
+                           for: .video,
+                           position: .back
+                       ),
+                       self.replaceVideoInput(with: ultraWide) {
+                        device = ultraWide
+                    } else if !wantsUltraWide, isUltraWide,
+                              let backCamera = self.discoverCamera(position: .back),
+                              self.replaceVideoInput(with: backCamera) {
+                        device = backCamera
+                    }
+                }
+
+                let hardwareZoom: CGFloat
+                if !self.isUsingFrontCamera,
+                   zoom <= 0.55,
+                   device.deviceType == .builtInUltraWideCamera {
+                    hardwareZoom = min(max(1, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
+                } else {
+                    hardwareZoom = min(
+                        max(zoom, device.minAvailableVideoZoomFactor),
+                        device.maxAvailableVideoZoomFactor
+                    )
+                }
+
+                try device.lockForConfiguration()
+                device.cancelVideoZoomRamp()
+                device.videoZoomFactor = hardwareZoom
+                device.unlockForConfiguration()
                 DispatchQueue.main.async { [weak self] in
-                    self?.selectedZoom = clamped
+                    self?.selectedZoom = zoom
                 }
             } catch {
                 DispatchQueue.main.async { [weak self] in
                     self?.errorMessage = "无法切换相机倍率。"
                 }
             }
+        }
+    }
+
+    private func replaceVideoInput(with device: AVCaptureDevice) -> Bool {
+        do {
+            let newInput = try AVCaptureDeviceInput(device: device)
+            session.beginConfiguration()
+            if let videoInput {
+                session.removeInput(videoInput)
+            }
+            guard session.canAddInput(newInput) else {
+                session.commitConfiguration()
+                return false
+            }
+            session.addInput(newInput)
+            session.commitConfiguration()
+            videoInput = newInput
+            cameraDevice = device
+            publishDeviceCapabilities(
+                device,
+                liveSupported: photoOutput.isLivePhotoCaptureSupported,
+                rawSupported: !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
+            )
+            return true
+        } catch {
+            return false
         }
     }
 
@@ -370,14 +426,36 @@ final class CameraController: ObservableObject {
     }
 
     private func discoverCamera(position: AVCaptureDevice.Position) -> AVCaptureDevice? {
-        let deviceTypes: [AVCaptureDevice.DeviceType] = position == .back
-            ? [.builtInTripleCamera, .builtInDualWideCamera, .builtInWideAngleCamera]
-            : [.builtInTrueDepthCamera, .builtInWideAngleCamera]
-        return AVCaptureDevice.DiscoverySession(
-            deviceTypes: deviceTypes,
-            mediaType: .video,
-            position: position
-        ).devices.first
+        if position == .back {
+            if let triple = AVCaptureDevice.default(
+                .builtInTripleCamera,
+                for: .video,
+                position: .back
+            ) {
+                return triple
+            }
+            if let dualWide = AVCaptureDevice.default(
+                .builtInDualWideCamera,
+                for: .video,
+                position: .back
+            ) {
+                return dualWide
+            }
+            return AVCaptureDevice.default(
+                .builtInWideAngleCamera,
+                for: .video,
+                position: .back
+            )
+        }
+        return AVCaptureDevice.default(
+            .builtInTrueDepthCamera,
+            for: .video,
+            position: .front
+        ) ?? AVCaptureDevice.default(
+            .builtInWideAngleCamera,
+            for: .video,
+            position: .front
+        )
     }
 
     private func publishDeviceCapabilities(
@@ -840,7 +918,7 @@ private enum CameraError: LocalizedError {
 
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
-    let onFocus: (_ screenPoint: CGPoint, _ devicePoint: CGPoint, _ lock: Bool) -> Void
+    let onFocus: (_ devicePoint: CGPoint, _ lock: Bool) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -888,7 +966,8 @@ struct CameraPreviewView: UIViewRepresentable {
             let devicePoint = view.previewLayer.captureDevicePointConverted(
                 fromLayerPoint: screenPoint
             )
-            parent.onFocus(screenPoint, devicePoint, false)
+            view.showFocusReticle(at: screenPoint, locked: false)
+            parent.onFocus(devicePoint, false)
         }
 
         @objc func focusLocked(_ gesture: UILongPressGestureRecognizer) {
@@ -899,7 +978,8 @@ struct CameraPreviewView: UIViewRepresentable {
             let devicePoint = view.previewLayer.captureDevicePointConverted(
                 fromLayerPoint: screenPoint
             )
-            parent.onFocus(screenPoint, devicePoint, true)
+            view.showFocusReticle(at: screenPoint, locked: true)
+            parent.onFocus(devicePoint, true)
         }
     }
 }
@@ -911,6 +991,44 @@ final class CameraPreviewUIView: UIView {
 
     var previewLayer: AVCaptureVideoPreviewLayer {
         layer as! AVCaptureVideoPreviewLayer
+    }
+
+    private var latestFocusLayer: CALayer?
+
+    func showFocusReticle(at point: CGPoint, locked: Bool) {
+        latestFocusLayer?.removeFromSuperlayer()
+
+        let reticle = CALayer()
+        let size: CGFloat = locked ? 62 : 54
+        reticle.frame = CGRect(
+            x: point.x - size / 2,
+            y: point.y - size / 2,
+            width: size,
+            height: size
+        )
+        reticle.borderColor = UIColor(
+            red: 0.851,
+            green: 0.467,
+            blue: 0.306,
+            alpha: 1
+        ).cgColor
+        reticle.borderWidth = 1.4
+        reticle.cornerRadius = 4
+        reticle.backgroundColor = UIColor.clear.cgColor
+
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 1.35
+        scale.toValue = 1
+        scale.duration = 0.18
+        reticle.add(scale, forKey: "focus-in")
+        previewLayer.addSublayer(reticle)
+        latestFocusLayer = reticle
+
+        guard !locked else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self, weak reticle] in
+            guard let reticle, self?.latestFocusLayer === reticle else { return }
+            reticle.removeFromSuperlayer()
+        }
     }
 }
 
@@ -924,8 +1042,6 @@ struct CameraView: View {
     @State private var flash: CameraFlashSetting = .auto
     @State private var livePhoto = false
     @State private var showGrid = true
-    @State private var focusIndicator: FocusIndicator?
-    @State private var focusDismissTask: Task<Void, Never>?
     @State private var zoomGestureBase: CGFloat?
 
     private let zoomOptions: [CGFloat] = [0.5, 1, 2, 4, 8]
@@ -935,9 +1051,9 @@ struct CameraView: View {
             Color.black.ignoresSafeArea()
             CameraPreviewView(
                 session: camera.session,
-                onFocus: { screenPoint, devicePoint, lock in
+                onFocus: { devicePoint, lock in
                     camera.focus(at: devicePoint, lock: lock)
-                    showFocusIndicator(at: screenPoint, locked: lock)
+                    GrainHaptics.lightImpact(enabled: true)
                 }
             )
                 .ignoresSafeArea()
@@ -957,12 +1073,6 @@ struct CameraView: View {
                     .frame(width: 160, height: 160)
                     .background(Color.black.opacity(0.48), in: Circle())
                     .transition(.scale.combined(with: .opacity))
-            }
-
-            if let focusIndicator {
-                FocusReticle(locked: focusIndicator.locked)
-                    .position(focusIndicator.point)
-                    .transition(.scale(scale: 1.35).combined(with: .opacity))
             }
 
             if !camera.isReady,
@@ -1010,7 +1120,6 @@ struct CameraView: View {
             await camera.start()
         }
         .onDisappear {
-            focusDismissTask?.cancel()
             camera.stop()
         }
         .onChange(of: format) { _, newValue in
@@ -1119,7 +1228,11 @@ struct CameraView: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .disabled(zoom < camera.minimumZoom || zoom > camera.maximumZoom)
+                    .disabled(
+                        (zoom < camera.minimumZoom
+                            && !(zoom == 0.5 && !camera.isUsingFrontCamera))
+                        || zoom > camera.maximumZoom
+                    )
                 }
             }
 
@@ -1309,49 +1422,6 @@ struct CameraView: View {
             }
     }
 
-    private func showFocusIndicator(at point: CGPoint, locked: Bool) {
-        focusDismissTask?.cancel()
-        let indicator = FocusIndicator(point: point, locked: locked)
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.72)) {
-            focusIndicator = indicator
-        }
-        GrainHaptics.lightImpact(enabled: true)
-        guard !locked else { return }
-        focusDismissTask = Task {
-            try? await Task.sleep(for: .seconds(1.2))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.18)) {
-                if focusIndicator?.id == indicator.id {
-                    focusIndicator = nil
-                }
-            }
-        }
-    }
-}
-
-private struct FocusIndicator: Identifiable {
-    let id = UUID()
-    let point: CGPoint
-    let locked: Bool
-}
-
-private struct FocusReticle: View {
-    let locked: Bool
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .stroke(GrainTheme.accent, lineWidth: 1.4)
-                .frame(width: 54, height: 54)
-            if locked {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(GrainTheme.accent)
-                    .offset(y: -36)
-            }
-        }
-        .allowsHitTesting(false)
-    }
 }
 
 private struct MenuChip: View {
