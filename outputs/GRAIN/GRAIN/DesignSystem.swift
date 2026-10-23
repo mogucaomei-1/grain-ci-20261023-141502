@@ -78,7 +78,7 @@ struct FilmPresetChip: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.82)
-                .frame(width: 96, minHeight: 25, alignment: .top)
+                .frame(width: 96, height: 25, alignment: .top)
         }
         .padding(5)
         .background(

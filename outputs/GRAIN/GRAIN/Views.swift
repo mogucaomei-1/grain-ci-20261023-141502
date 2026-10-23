@@ -949,7 +949,7 @@ private struct FilmPresetBar: View {
                             Text("编辑排序")
                                 .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                                 .foregroundStyle(GrainTheme.paper)
-                                .frame(width: 96, minHeight: 25)
+                                .frame(width: 96, height: 25)
                         }
                         .padding(5)
                     }
