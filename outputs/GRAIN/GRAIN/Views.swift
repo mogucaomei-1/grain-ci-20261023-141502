@@ -10,6 +10,7 @@ struct RootView: View {
     @State private var showExportSheet = false
     @State private var showInfoSheet = false
     @State private var showSettings = false
+    @State private var showCamera = false
     @State private var libraryImportTask: Task<Void, Never>?
     @State private var libraryImportGeneration = 0
 
@@ -21,6 +22,7 @@ struct RootView: View {
                 VStack(spacing: 0) {
                     MinimalTopBar(
                         hasPhoto: false,
+                        onCamera: { showCamera = true },
                         onFiles: { showDocumentPicker = true },
                         onInfo: { showInfoSheet = true },
                         onSettings: { showSettings = true },
@@ -42,6 +44,7 @@ struct RootView: View {
                     VStack(spacing: 0) {
                         MinimalTopBar(
                             hasPhoto: true,
+                            onCamera: nil,
                             onFiles: { showDocumentPicker = true },
                             onInfo: { showInfoSheet = true },
                             onSettings: { showSettings = true },
@@ -95,6 +98,9 @@ struct RootView: View {
             AppSettingsView()
                 .presentationDetents([.height(290)])
                 .presentationDragIndicator(.visible)
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraView()
         }
         .alert(
             "无法打开照片",
@@ -195,6 +201,7 @@ struct RootView: View {
 
 private struct MinimalTopBar: View {
     let hasPhoto: Bool
+    let onCamera: (() -> Void)?
     let onFiles: () -> Void
     let onInfo: () -> Void
     let onSettings: () -> Void
@@ -222,6 +229,17 @@ private struct MinimalTopBar: View {
 
             Spacer()
 
+            if let onCamera {
+                Button(action: onCamera) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(width: 38, height: 38)
+                        .background(GrainTheme.raised, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("打开相机")
+            }
+
             Button(action: onFiles) {
                 Image(systemName: "folder")
                     .font(.system(size: 14, weight: .medium))
@@ -241,26 +259,26 @@ private struct MinimalTopBar: View {
             .buttonStyle(.plain)
             .accessibilityLabel(histogramVisible ? "隐藏直方图" : "显示直方图")
 
-            Button(action: onInfo) {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(hasPhoto ? GrainTheme.paper : GrainTheme.muted)
-                    .frame(width: 38, height: 38)
-                    .background(GrainTheme.raised, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .disabled(!hasPhoto)
-            .accessibilityLabel("查看图片信息")
+            if hasPhoto {
+                Button(action: onInfo) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(GrainTheme.paper)
+                        .frame(width: 38, height: 38)
+                        .background(GrainTheme.raised, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("查看图片信息")
 
-            Button(action: onExport) {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(hasPhoto ? GrainTheme.black : GrainTheme.muted)
-                    .frame(width: 38, height: 38)
-                    .background(hasPhoto ? GrainTheme.paper : GrainTheme.raised, in: Circle())
+                Button(action: onExport) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(GrainTheme.black)
+                        .frame(width: 38, height: 38)
+                        .background(GrainTheme.paper, in: Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            .disabled(!hasPhoto)
         }
         .foregroundStyle(GrainTheme.paper)
         .padding(.horizontal, 18)

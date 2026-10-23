@@ -594,6 +594,48 @@ struct RawImageProcessor {
                 "inputBVector": CIVector(x: 0.02, y: 0.06, z: 1.08, w: 0),
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
             ])
+        case .dazzFxnR:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.02, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.03, z: 0.02, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.02, z: 0.98, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .dazzCCDR:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.04, y: 0.03, z: 0.01, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.00, z: 0.02, w: 0),
+                "inputBVector": CIVector(x: 0.02, y: 0.03, z: 0.96, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .dazzDClassic:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.03, y: 0.02, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 0.99, z: 0.02, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.04, z: 0.94, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .dazzGRDR:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0.96, y: 0.02, z: 0.02, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.01, z: 0.03, w: 0),
+                "inputBVector": CIVector(x: 0.01, y: 0.03, z: 1.04, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .dazzDFunS:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.06, y: 0.01, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1.02, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.02, z: 0.96, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+        case .dazzClassicU:
+            return image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1.04, y: 0.02, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0.01, y: 1.00, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0.04, z: 0.91, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
         default:
             return image
         }

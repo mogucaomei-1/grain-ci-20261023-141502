@@ -26,6 +26,12 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
     case c200
     case ektachrome100
     case vision500t
+    case dazzFxnR
+    case dazzCCDR
+    case dazzDClassic
+    case dazzGRDR
+    case dazzDFunS
+    case dazzClassicU
 
     var id: String { rawValue }
 
@@ -54,6 +60,12 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .c200: "富士 C200"
         case .ektachrome100: "柯达 反转片 E100"
         case .vision500t: "电影 Vision3 500T"
+        case .dazzFxnR: "FXN R · 富士全能"
+        case .dazzCCDR: "CCD R · 人像柔光"
+        case .dazzDClassic: "D Classic · 街拍故事"
+        case .dazzGRDR: "GRD R · 蓝绿静谧"
+        case .dazzDFunS: "D FunS · 晴天高彩"
+        case .dazzClassicU: "Classic U · 复古负片"
         }
     }
 
@@ -82,6 +94,12 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .c200: "C200"
         case .ektachrome100: "E100"
         case .vision500t: "500T"
+        case .dazzFxnR: "FXN R"
+        case .dazzCCDR: "CCD R"
+        case .dazzDClassic: "D Classic"
+        case .dazzGRDR: "GRD R"
+        case .dazzDFunS: "D FunS"
+        case .dazzClassicU: "Classic U"
         }
     }
 
@@ -110,6 +128,12 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .c200: "清透青绿 · 柔和低对比"
         case .ektachrome100: "通透红蓝 · 干净高光"
         case .vision500t: "暖钨丝光 · 深青夜景"
+        case .dazzFxnR: "清透富士色 · 全场景稳定出片"
+        case .dazzCCDR: "柔化皮肤 · 旧数码颗粒感"
+        case .dazzDClassic: "低调街拍 · 复古故事感"
+        case .dazzGRDR: "理光式蓝绿 · 安静城市色调"
+        case .dazzDFunS: "阳光高饱和 · 明快彩色负片"
+        case .dazzClassicU: "金黄褪色 · 老胶片日常感"
         }
     }
 
@@ -138,6 +162,12 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
         case .c200: [0x3E7168, 0x7DA88A, 0xD7C7A5]
         case .ektachrome100: [0x285E69, 0xA93D39, 0xE0B765]
         case .vision500t: [0x203B4D, 0x9A5437, 0xD2A46E]
+        case .dazzFxnR: [0x356A6C, 0x90AC8B, 0xDFC59D]
+        case .dazzCCDR: [0x8D5E58, 0xD3A998, 0xE8D9C9]
+        case .dazzDClassic: [0x3C4E47, 0xA16B4A, 0xD2B487]
+        case .dazzGRDR: [0x244E58, 0x587E77, 0xB9AE91]
+        case .dazzDFunS: [0xB84A34, 0xE38D3C, 0xF0D26E]
+        case .dazzClassicU: [0x7D4B35, 0xC68A54, 0xE2C89D]
         }
     }
 
@@ -258,6 +288,36 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable, Sendable {
                   highlights: -7, shadows: 10, whites: -3, blacks: 5,
                   contrast: -2, vibrance: 6, saturation: -4, clarity: -3,
                   fade: 10, grain: 28, vignette: 24, sharpness: 2)
+        case .dazzFxnR:
+            .init(exposure: 0.03, temperature: 6300, tint: -2,
+                  highlights: -8, shadows: 6, whites: 2, blacks: 3,
+                  contrast: 8, vibrance: 8, saturation: 0, clarity: 2,
+                  fade: 5, grain: 16, vignette: 12, sharpness: 8)
+        case .dazzCCDR:
+            .init(exposure: 0.12, temperature: 6900, tint: 6,
+                  highlights: -10, shadows: 10, whites: -2, blacks: 5,
+                  contrast: -5, vibrance: 4, saturation: -3, clarity: -4,
+                  fade: 12, grain: 8, vignette: 14, sharpness: 2)
+        case .dazzDClassic:
+            .init(exposure: -0.02, temperature: 6200, tint: -1,
+                  highlights: -9, shadows: 5, whites: 2, blacks: 7,
+                  contrast: 10, vibrance: 3, saturation: -6, clarity: 3,
+                  fade: 8, grain: 22, vignette: 20, sharpness: 8)
+        case .dazzGRDR:
+            .init(exposure: -0.03, temperature: 6100, tint: -4,
+                  highlights: -7, shadows: 3, whites: 3, blacks: 5,
+                  contrast: 13, vibrance: 5, saturation: -10, clarity: 5,
+                  fade: 3, grain: 16, vignette: 17, sharpness: 10)
+        case .dazzDFunS:
+            .init(exposure: 0.06, temperature: 7400, tint: 5,
+                  highlights: -5, shadows: 4, whites: 4, blacks: 2,
+                  contrast: 12, vibrance: 15, saturation: 15, clarity: 5,
+                  fade: 4, grain: 18, vignette: 12, sharpness: 8)
+        case .dazzClassicU:
+            .init(exposure: 0.08, temperature: 7100, tint: 4,
+                  highlights: -11, shadows: 9, whites: -4, blacks: 7,
+                  contrast: 0, vibrance: 5, saturation: -2, clarity: -2,
+                  fade: 15, grain: 26, vignette: 18, sharpness: 3)
         }
     }
 }
