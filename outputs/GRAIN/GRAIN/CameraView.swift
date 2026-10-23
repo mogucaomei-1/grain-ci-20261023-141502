@@ -3,6 +3,7 @@ import CoreImage
 import ImageIO
 import Photos
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 enum CameraCaptureFormat: String, CaseIterable, Identifiable {
@@ -182,10 +183,6 @@ final class CameraController: ObservableObject {
     @Published private(set) var minimumExposureBias: Float = -2
     @Published private(set) var maximumExposureBias: Float = 2
     @Published private(set) var isUsingFrontCamera = false
-
-    deinit {
-        session.stopRunning()
-    }
 
     func start() async {
         let cameraAllowed = await requestMediaAccess(for: .video)
@@ -1180,6 +1177,7 @@ struct CameraView: View {
     @AppStorage("filmOrder") private var filmOrder = ""
     @State private var cameraProfile: FilmProfile = .neutral
     @State private var cameraIntensity = 1.0
+    @State private var didSwipeBack = false
 
     private let zoomOptions: [CGFloat] = [0.5, 1, 2, 4, 8]
 
@@ -1277,12 +1275,13 @@ struct CameraView: View {
         .onChange(of: cameraIntensity) { _, _ in
             applyCameraPreviewLook()
         }
+        .simultaneousGesture(edgeSwipeBackGesture)
     }
 
     private var topBar: some View {
         HStack(spacing: 11) {
             Button {
-                dismiss()
+                closeCamera()
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
@@ -1637,6 +1636,29 @@ struct CameraView: View {
             settings: settings,
             intensity: cameraProfile == .neutral ? 1 : cameraIntensity
         )
+    }
+
+    private var edgeSwipeBackGesture: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+            .onChanged { value in
+                guard !didSwipeBack,
+                      value.startLocation.x <= 36,
+                      value.translation.width > 70,
+                      value.translation.width > abs(value.translation.height) * 1.35
+                else { return }
+                didSwipeBack = true
+                GrainHaptics.mediumImpact(enabled: true)
+                closeCamera()
+            }
+            .onEnded { _ in
+                didSwipeBack = false
+            }
+    }
+
+    private func closeCamera() {
+        camera.cancelCapture()
+        camera.stop()
+        dismiss()
     }
 
     private var pinchToZoomGesture: some Gesture {
