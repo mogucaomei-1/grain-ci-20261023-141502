@@ -126,6 +126,7 @@ final class CameraController: ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     private let sessionQueue = DispatchQueue(label: "studio.grain.camera.session")
     private var cameraDevice: AVCaptureDevice?
+    private var videoInput: AVCaptureDeviceInput?
     private var activeProcessors: [Int64: CameraPhotoCaptureProcessor] = [:]
     private var captureGeneration = 0
     private var microphoneAllowed = false
@@ -141,6 +142,10 @@ final class CameraController: ObservableObject {
     @Published private(set) var minimumZoom: CGFloat = 1
     @Published private(set) var maximumZoom: CGFloat = 8
     @Published private(set) var selectedZoom: CGFloat = 1
+    @Published private(set) var exposureBias: Float = 0
+    @Published private(set) var minimumExposureBias: Float = -2
+    @Published private(set) var maximumExposureBias: Float = 2
+    @Published private(set) var isUsingFrontCamera = false
 
     deinit {
         session.stopRunning()
@@ -186,6 +191,83 @@ final class CameraController: ObservableObject {
         }
     }
 
+    func focus(at devicePoint: CGPoint, lock: Bool) {
+        guard let cameraDevice else { return }
+        sessionQueue.async {
+            do {
+                try cameraDevice.lockForConfiguration()
+                if cameraDevice.isFocusPointOfInterestSupported {
+                    cameraDevice.focusPointOfInterest = devicePoint
+                    cameraDevice.focusMode = lock ? .locked : .autoFocus
+                }
+                if cameraDevice.isExposurePointOfInterestSupported {
+                    cameraDevice.exposurePointOfInterest = devicePoint
+                    cameraDevice.exposureMode = lock ? .locked : .autoExpose
+                }
+                cameraDevice.unlockForConfiguration()
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.errorMessage = "无法设置对焦区域。"
+                }
+            }
+        }
+    }
+
+    func setExposureBias(_ value: Float) {
+        guard let cameraDevice else { return }
+        let clamped = min(max(value, cameraDevice.minExposureTargetBias), cameraDevice.maxExposureTargetBias)
+        sessionQueue.async {
+            do {
+                try cameraDevice.lockForConfiguration()
+                cameraDevice.setExposureTargetBias(clamped)
+                cameraDevice.unlockForConfiguration()
+                DispatchQueue.main.async { [weak self] in
+                    self?.exposureBias = clamped
+                }
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.errorMessage = "无法调整曝光补偿。"
+                }
+            }
+        }
+    }
+
+    func toggleCamera() {
+        let targetPosition: AVCaptureDevice.Position = isUsingFrontCamera ? .back : .front
+        guard let device = discoverCamera(position: targetPosition) else {
+            errorMessage = "没有找到可切换的镜头。"
+            return
+        }
+
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            do {
+                let newInput = try AVCaptureDeviceInput(device: device)
+                self.session.beginConfiguration()
+                if let videoInput = self.videoInput {
+                    self.session.removeInput(videoInput)
+                }
+                guard self.session.canAddInput(newInput) else {
+                    self.session.commitConfiguration()
+                    throw CameraError.cannotConfigure
+                }
+                self.session.addInput(newInput)
+                self.session.commitConfiguration()
+                self.videoInput = newInput
+                self.cameraDevice = device
+                self.publishDeviceCapabilities(
+                    device,
+                    liveSupported: self.photoOutput.isLivePhotoCaptureSupported,
+                    rawSupported: !self.photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
+                )
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
     func capture(_ configuration: CameraCaptureConfiguration) {
         guard isReady, !isCapturing else { return }
         captureGeneration += 1
@@ -215,16 +297,7 @@ final class CameraController: ObservableObject {
     }
 
     private func configureSession() {
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [
-                .builtInTripleCamera,
-                .builtInDualWideCamera,
-                .builtInWideAngleCamera
-            ],
-            mediaType: .video,
-            position: .back
-        )
-        guard let device = discovery.devices.first else {
+        guard let device = discoverCamera(position: .back) else {
             DispatchQueue.main.async { [weak self] in
                 self?.errorMessage = "当前设备没有可用的后置相机。"
             }
@@ -246,6 +319,7 @@ final class CameraController: ObservableObject {
                 throw CameraError.cannotConfigure
             }
             session.addInput(input)
+            videoInput = input
 
             if microphoneAllowed,
                let microphone = AVCaptureDevice.default(for: .audio),
@@ -270,8 +344,6 @@ final class CameraController: ObservableObject {
             }
 
             cameraDevice = device
-            let minZoom = device.minAvailableVideoZoomFactor
-            let maxZoom = max(device.maxAvailableVideoZoomFactor, 8)
             let liveSupported = photoOutput.isLivePhotoCaptureSupported
             let rawSupported = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
             let maxDims = maximumDimensions ?? CMVideoDimensions(width: 0, height: 0)
@@ -282,18 +354,48 @@ final class CameraController: ObservableObject {
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                self.minimumZoom = minZoom
-                self.maximumZoom = maxZoom
-                self.selectedZoom = min(max(1, minZoom), maxZoom)
-                self.isLivePhotoSupported = liveSupported
-                self.isRawSupported = rawSupported
                 self.maxPhotoDimensions = maxDims
                 self.isReady = true
+                self.publishDeviceCapabilities(
+                    device,
+                    liveSupported: liveSupported,
+                    rawSupported: rawSupported
+                )
             }
         } catch {
             DispatchQueue.main.async { [weak self] in
                 self?.errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func discoverCamera(position: AVCaptureDevice.Position) -> AVCaptureDevice? {
+        let deviceTypes: [AVCaptureDevice.DeviceType] = position == .back
+            ? [.builtInTripleCamera, .builtInDualWideCamera, .builtInWideAngleCamera]
+            : [.builtInTrueDepthCamera, .builtInWideAngleCamera]
+        return AVCaptureDevice.DiscoverySession(
+            deviceTypes: deviceTypes,
+            mediaType: .video,
+            position: position
+        ).devices.first
+    }
+
+    private func publishDeviceCapabilities(
+        _ device: AVCaptureDevice,
+        liveSupported: Bool,
+        rawSupported: Bool
+    ) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.minimumZoom = device.minAvailableVideoZoomFactor
+            self.maximumZoom = max(device.maxAvailableVideoZoomFactor, 8)
+            self.selectedZoom = min(max(1, self.minimumZoom), self.maximumZoom)
+            self.minimumExposureBias = device.minExposureTargetBias
+            self.maximumExposureBias = device.maxExposureTargetBias
+            self.exposureBias = min(max(0, device.minExposureTargetBias), device.maxExposureTargetBias)
+            self.isUsingFrontCamera = device.position == .front
+            self.isLivePhotoSupported = liveSupported
+            self.isRawSupported = rawSupported
         }
     }
 
@@ -738,6 +840,11 @@ private enum CameraError: LocalizedError {
 
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
+    let onFocus: (_ screenPoint: CGPoint, _ devicePoint: CGPoint, _ lock: Bool) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
 
     func makeUIView(context: Context) -> CameraPreviewUIView {
         let view = CameraPreviewUIView()
@@ -747,12 +854,52 @@ struct CameraPreviewView: UIViewRepresentable {
            connection.isVideoRotationAngleSupported(90) {
             connection.videoRotationAngle = 90
         }
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.focusTapped(_:))
+        )
+        let longPress = UILongPressGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.focusLocked(_:))
+        )
+        longPress.minimumPressDuration = 0.48
+        view.addGestureRecognizer(tap)
+        view.addGestureRecognizer(longPress)
         return view
     }
 
     func updateUIView(_ uiView: CameraPreviewUIView, context: Context) {
+        context.coordinator.parent = self
         if uiView.previewLayer.session !== session {
             uiView.previewLayer.session = session
+        }
+    }
+
+    final class Coordinator: NSObject {
+        var parent: CameraPreviewView
+
+        init(parent: CameraPreviewView) {
+            self.parent = parent
+        }
+
+        @objc func focusTapped(_ gesture: UITapGestureRecognizer) {
+            guard let view = gesture.view as? CameraPreviewUIView else { return }
+            let screenPoint = gesture.location(in: view)
+            let devicePoint = view.previewLayer.captureDevicePointConverted(
+                fromLayerPoint: screenPoint
+            )
+            parent.onFocus(screenPoint, devicePoint, false)
+        }
+
+        @objc func focusLocked(_ gesture: UILongPressGestureRecognizer) {
+            guard gesture.state == .began,
+                  let view = gesture.view as? CameraPreviewUIView
+            else { return }
+            let screenPoint = gesture.location(in: view)
+            let devicePoint = view.previewLayer.captureDevicePointConverted(
+                fromLayerPoint: screenPoint
+            )
+            parent.onFocus(screenPoint, devicePoint, true)
         }
     }
 }
@@ -776,14 +923,25 @@ struct CameraView: View {
     @State private var timer: CameraTimer = .off
     @State private var flash: CameraFlashSetting = .auto
     @State private var livePhoto = false
+    @State private var showGrid = true
+    @State private var focusIndicator: FocusIndicator?
+    @State private var focusDismissTask: Task<Void, Never>?
+    @State private var zoomGestureBase: CGFloat?
 
     private let zoomOptions: [CGFloat] = [0.5, 1, 2, 4, 8]
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            CameraPreviewView(session: camera.session)
+            CameraPreviewView(
+                session: camera.session,
+                onFocus: { screenPoint, devicePoint, lock in
+                    camera.focus(at: devicePoint, lock: lock)
+                    showFocusIndicator(at: screenPoint, locked: lock)
+                }
+            )
                 .ignoresSafeArea()
+                .simultaneousGesture(pinchToZoomGesture)
             framingOverlay
 
             VStack(spacing: 0) {
@@ -799,6 +957,12 @@ struct CameraView: View {
                     .frame(width: 160, height: 160)
                     .background(Color.black.opacity(0.48), in: Circle())
                     .transition(.scale.combined(with: .opacity))
+            }
+
+            if let focusIndicator {
+                FocusReticle(locked: focusIndicator.locked)
+                    .position(focusIndicator.point)
+                    .transition(.scale(scale: 1.35).combined(with: .opacity))
             }
 
             if !camera.isReady,
@@ -846,6 +1010,7 @@ struct CameraView: View {
             await camera.start()
         }
         .onDisappear {
+            focusDismissTask?.cancel()
             camera.stop()
         }
         .onChange(of: format) { _, newValue in
@@ -899,6 +1064,18 @@ struct CameraView: View {
             .buttonStyle(.plain)
             .disabled(!camera.isLivePhotoSupported || format == .raw)
 
+            Button {
+                showGrid.toggle()
+                GrainHaptics.selection(enabled: true)
+            } label: {
+                Image(systemName: "square.grid.3x3")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(showGrid ? GrainTheme.accent : GrainTheme.paper.opacity(0.62))
+                    .frame(width: 38, height: 38)
+                    .background(Color.black.opacity(0.58), in: Circle())
+            }
+            .buttonStyle(.plain)
+
             Menu {
                 ForEach(CameraTimer.allCases) { option in
                     Button(option.title) { timer = option }
@@ -944,6 +1121,28 @@ struct CameraView: View {
                     .buttonStyle(.plain)
                     .disabled(zoom < camera.minimumZoom || zoom > camera.maximumZoom)
                 }
+            }
+
+            HStack(spacing: 9) {
+                Image(systemName: "sun.min")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(GrainTheme.muted)
+                Slider(
+                    value: Binding(
+                        get: { Double(camera.exposureBias) },
+                        set: { camera.setExposureBias(Float($0)) }
+                    ),
+                    in: Double(camera.minimumExposureBias)...Double(camera.maximumExposureBias),
+                    step: 0.1
+                )
+                .tint(GrainTheme.accent)
+                Text(String(format: "%+.1f", camera.exposureBias))
+                    .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(GrainTheme.paper)
+                    .frame(width: 34, alignment: .trailing)
+                Image(systemName: "sun.max")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(GrainTheme.muted)
             }
 
             HStack(spacing: 8) {
@@ -1016,48 +1215,55 @@ struct CameraView: View {
 
                 Spacer()
 
-                VStack(spacing: 2) {
-                    Text(format.title)
-                    Text(resolution.title)
+                Button {
+                    camera.toggleCamera()
+                    GrainHaptics.mediumImpact(enabled: true)
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath.camera")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(GrainTheme.paper)
+                        .frame(width: 46, height: 46)
+                        .background(Color.black.opacity(0.54), in: Circle())
                 }
-                .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
-                .foregroundStyle(GrainTheme.paper.opacity(0.66))
+                .buttonStyle(.plain)
                 .frame(width: 58)
             }
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 14)
         .padding(.top, 16)
-        .padding(.bottom, 22)
-        .background(
-            LinearGradient(
-                colors: [.clear, Color.black.opacity(0.9)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .padding(.bottom, 10)
+        .background(Color.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 28))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28)
+                .stroke(Color.white.opacity(0.10), lineWidth: 0.8)
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 
     private var framingOverlay: some View {
         GeometryReader { proxy in
             let available = CGSize(
                 width: proxy.size.width - 30,
-                height: proxy.size.height - 210
+                height: proxy.size.height - 300
             )
             let rect = fittedFrame(for: aspect.ratio, in: available)
                 .offsetBy(dx: 15, dy: 92)
 
             ZStack {
-                Path { path in
-                    for index in 1...2 {
-                        let x = rect.minX + rect.width * CGFloat(index) / 3
-                        path.move(to: CGPoint(x: x, y: rect.minY))
-                        path.addLine(to: CGPoint(x: x, y: rect.maxY))
-                        let y = rect.minY + rect.height * CGFloat(index) / 3
-                        path.move(to: CGPoint(x: rect.minX, y: y))
-                        path.addLine(to: CGPoint(x: rect.maxX, y: y))
+                if showGrid {
+                    Path { path in
+                        for index in 1...2 {
+                            let x = rect.minX + rect.width * CGFloat(index) / 3
+                            path.move(to: CGPoint(x: x, y: rect.minY))
+                            path.addLine(to: CGPoint(x: x, y: rect.maxY))
+                            let y = rect.minY + rect.height * CGFloat(index) / 3
+                            path.move(to: CGPoint(x: rect.minX, y: y))
+                            path.addLine(to: CGPoint(x: rect.maxX, y: y))
+                        }
                     }
+                    .stroke(Color.white.opacity(0.18), lineWidth: 0.7)
                 }
-                .stroke(Color.white.opacity(0.18), lineWidth: 0.7)
 
                 Rectangle()
                     .stroke(Color.white.opacity(0.44), lineWidth: 1)
@@ -1087,6 +1293,64 @@ struct CameraView: View {
 
     private func zoomLabel(_ zoom: CGFloat) -> String {
         zoom == floor(zoom) ? String(Int(zoom)) : String(format: "%.1f", zoom)
+    }
+
+    private var pinchToZoomGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                if zoomGestureBase == nil {
+                    zoomGestureBase = camera.selectedZoom
+                }
+                guard let zoomGestureBase else { return }
+                camera.setZoom(zoomGestureBase * value)
+            }
+            .onEnded { _ in
+                zoomGestureBase = nil
+            }
+    }
+
+    private func showFocusIndicator(at point: CGPoint, locked: Bool) {
+        focusDismissTask?.cancel()
+        let indicator = FocusIndicator(point: point, locked: locked)
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.72)) {
+            focusIndicator = indicator
+        }
+        GrainHaptics.lightImpact(enabled: true)
+        guard !locked else { return }
+        focusDismissTask = Task {
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.18)) {
+                if focusIndicator?.id == indicator.id {
+                    focusIndicator = nil
+                }
+            }
+        }
+    }
+}
+
+private struct FocusIndicator: Identifiable {
+    let id = UUID()
+    let point: CGPoint
+    let locked: Bool
+}
+
+private struct FocusReticle: View {
+    let locked: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .stroke(GrainTheme.accent, lineWidth: 1.4)
+                .frame(width: 54, height: 54)
+            if locked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(GrainTheme.accent)
+                    .offset(y: -36)
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 

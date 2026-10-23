@@ -27,9 +27,7 @@ struct RootView: View {
                         onInfo: { showInfoSheet = true },
                         onSettings: { showSettings = true },
                         histogramVisible: showHistogram,
-                        onToggleHistogram: {
-                            showHistogram.toggle()
-                        },
+                        onToggleHistogram: nil,
                         onExport: {}
                     )
 
@@ -96,7 +94,7 @@ struct RootView: View {
         }
         .sheet(isPresented: $showSettings) {
             AppSettingsView()
-                .presentationDetents([.height(290)])
+                .presentationDetents([.height(390)])
                 .presentationDragIndicator(.visible)
         }
         .fullScreenCover(isPresented: $showCamera) {
@@ -206,7 +204,7 @@ private struct MinimalTopBar: View {
     let onInfo: () -> Void
     let onSettings: () -> Void
     let histogramVisible: Bool
-    let onToggleHistogram: () -> Void
+    let onToggleHistogram: (() -> Void)?
     let onExport: () -> Void
 
     var body: some View {
@@ -249,15 +247,17 @@ private struct MinimalTopBar: View {
             .buttonStyle(.plain)
             .accessibilityLabel("从文件导入")
 
-            Button(action: onToggleHistogram) {
-                Image(systemName: "waveform.path.ecg.rectangle")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(histogramVisible ? GrainTheme.accent : GrainTheme.muted)
-                    .frame(width: 38, height: 38)
-                    .background(GrainTheme.raised, in: Circle())
+            if let onToggleHistogram {
+                Button(action: onToggleHistogram) {
+                    Image(systemName: "waveform.path.ecg.rectangle")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(histogramVisible ? GrainTheme.accent : GrainTheme.muted)
+                        .frame(width: 38, height: 38)
+                        .background(GrainTheme.raised, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(histogramVisible ? "隐藏直方图" : "显示直方图")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(histogramVisible ? "隐藏直方图" : "显示直方图")
 
             if hasPhoto {
                 Button(action: onInfo) {
@@ -311,7 +311,7 @@ private struct EditorWorkspace: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             FilmPresetBar()
-                .frame(height: 150)
+                .frame(height: 168)
 
             AdjustPanel(
                 onCrop: { showCropEditor = true },
@@ -943,15 +943,15 @@ private struct FilmPresetBar: View {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(GrainTheme.paper)
-                                .frame(width: 71, height: 49)
+                                .frame(width: 92, height: 56)
                                 .background(GrainTheme.raised, in: RoundedRectangle(cornerRadius: 9))
 
-                            Text("编辑")
+                            Text("编辑排序")
                                 .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                                 .foregroundStyle(GrainTheme.paper)
-                                .frame(width: 72)
+                                .frame(width: 96, minHeight: 25)
                         }
-                        .padding(4)
+                        .padding(5)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("编辑胶片排序")

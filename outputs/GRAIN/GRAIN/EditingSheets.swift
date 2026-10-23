@@ -378,6 +378,7 @@ struct FilmOrderEditorView: View {
 struct AppSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
+    @AppStorage("showHistogram") private var showHistogram = true
 
     var body: some View {
         ZStack {
@@ -422,6 +423,30 @@ struct AppSettingsView: View {
                                 GrainHaptics.lightImpact(enabled: true)
                             }
                         }
+                }
+                .padding(16)
+                .background(GrainTheme.surface, in: RoundedRectangle(cornerRadius: 17))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 17)
+                        .stroke(GrainTheme.line, lineWidth: 0.8)
+                }
+
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform.path.ecg.rectangle")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(GrainTheme.accent)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("主页直方图")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        Text("打开照片后显示实时 RGB 直方图")
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundStyle(GrainTheme.muted)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $showHistogram)
+                        .labelsHidden()
+                        .tint(GrainTheme.accent)
                 }
                 .padding(16)
                 .background(GrainTheme.surface, in: RoundedRectangle(cornerRadius: 17))
